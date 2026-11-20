@@ -1,59 +1,45 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Delivery
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Bozorlik va yetkazib berish xizmati: mijoz ilovada xaridlar ro'yxatini yuboradi → moderator admin panelda tasdiqlaydi va kuryerni tanlaydi → kuryer bozordan sotib olib, mijozga yetkazadi.
 
-## About Laravel
+- **Mijoz ilovasi** va **kuryer ilovasi** — REST API (`/api/v1`, Laravel Sanctum). Hujjat: [docs/api.md](docs/api.md)
+- **Admin panel** — `/admin` (moderator va administrator)
+- Arxitektura: [docs/architecture.md](docs/architecture.md) · Holatlar: [docs/order-status-flow.md](docs/order-status-flow.md)
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+Stek: Laravel 12, PHP 8.2+, MySQL/MariaDB, Blade (build qadamisiz). To'lov: hozircha naqd; Click/Payme uchun joy tayyor.
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## O'rnatish (lokal, MAMP)
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+```bash
+composer install
+cp .env.example .env && php artisan key:generate
+# .env: DB_DATABASE=delivery, DB_PORT=8889 (MAMP)
+php artisan migrate --seed      # demo ma'lumot bilan
+php artisan storage:link
+php artisan serve               # http://127.0.0.1:8000/admin
+```
 
-## Learning Laravel
+| Rol | Login | Parol |
+|---|---|---|
+| Administrator | `+998900000001` | `admin12345` |
+| Moderator | `+998900000002` | `moderator123` |
+| Kuryer (API) | `+998901110001` | `courier123` |
+| Mijoz (API) | `+998935550001` | SMS kod — test rejimida `1111` |
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework. You can also check out [Laravel Learn](https://laravel.com/learn), where you will be guided through building a modern Laravel application.
+## Testlar
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+```bash
+vendor/bin/phpunit                    # SQLite :memory:
+DB_CONNECTION=mysql DB_HOST=127.0.0.1 DB_PORT=8889 DB_DATABASE=delivery_test DB_USERNAME=root DB_PASSWORD=root vendor/bin/phpunit
+vendor/bin/pint                       # kod formati
+```
 
-## Laravel Sponsors
+## Serverga chiqarish (test rejimi)
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
-
-### Premium Partners
-
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
-
-## Contributing
-
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
-
-## Code of Conduct
-
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
-
-## Security Vulnerabilities
-
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
-
-## License
-
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+1. `.env`: `APP_ENV=production`, `APP_DEBUG=false`, `APP_URL`, baza ma'lumotlari.
+   Test rejimida `OTP_FIXED_CODE=1111` qoldirish mumkin; **haqiqiy foydalanuvchilar kelishidan oldin bo'sh qiling** va SMS drayverini ulang.
+2. `composer install --no-dev --optimize-autoloader`
+3. `php artisan migrate --force && php artisan db:seed --class=StaffSeeder --force` (faqat administrator; demo kerak bo'lsa `db:seed --force`)
+4. `php artisan storage:link && php artisan config:cache && php artisan route:cache && php artisan view:cache`
+5. Web root → `public/`. Navbat ishchisi hozir shart emas (bildirishnomalar sinxron).
+6. Administrator bilan kirib parolni darhol almashtiring (Profil).
