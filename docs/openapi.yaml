@@ -1,0 +1,997 @@
+openapi: 3.0.3
+info:
+  title: Delivery API
+  version: 1.0.0
+  description: |
+    Bozorlik va yetkazib berish xizmatining **mijoz** va **kuryer** mobil ilovalari uchun REST API.
+
+    **Asosiy oqim:** mijoz xaridlar ro'yxatini yuboradi → moderator admin panelda tasdiqlaydi va kuryerni tanlaydi →
+    kuryer qabul qiladi, bozorlik qiladi (har bir mahsulot narxini kiritadi) → yetkazadi va naqd pulni oladi.
+
+    **Avtorizatsiya:** `Authorization: Bearer <token>`. Token `POST /auth/otp/verify` (mijoz) yoki
+    `POST /auth/courier/login` (kuryer) dan olinadi. Mijoz tokeni kuryer endpointlariga va aksincha ishlamaydi (403).
+
+    **Javob formati:** bitta obyekt — `{ "data": {...} }`, ro'yxat — `{ "data": [...], "links": {...}, "meta": {...} }`.
+    Lug'at maydonlari `{ "value", "label" }` ko'rinishida: ilova mantiqni `value` bo'yicha quradi, foydalanuvchiga `label` ni ko'rsatadi.
+
+    **Xatolar:** har doim `{ "message": "..." }` (o'zbekcha, foydalanuvchiga ko'rsatsa bo'ladi). Validatsiya xatosida qo'shimcha `errors` obyekti.
+
+    **Vaqt:** ISO 8601, `Asia/Tashkent` (+05:00). **Pul:** butun so'm (integer). **Telefon:** `+998XXXXXXXXX`
+    (so'rovda istalgan ko'rinishda yuborish mumkin — server normallashtiradi).
+
+    Batafsil qo'llanma: `docs/api.md`.
+  contact:
+    name: Delivery backend
+servers:
+  - url: /api/v1
+    description: Joriy server
+  - url: http://127.0.0.1:8000/api/v1
+    description: Lokal (php artisan serve)
+tags:
+  - name: Umumiy
+    description: Avtorizatsiyasiz ma'lumotlar
+  - name: Avtorizatsiya
+  - name: Profil
+    description: Mijoz va kuryer uchun umumiy
+  - name: Bildirishnomalar
+    description: Mijoz va kuryer uchun umumiy
+  - name: Mijoz — manzillar
+  - name: Mijoz — buyurtmalar
+  - name: Kuryer — holat
+  - name: Kuryer — buyurtmalar
+
+paths:
+  /meta:
+    get:
+      tags: [Umumiy]
+      summary: Ilova sozlamalari va lug'atlar
+      description: Ilova ishga tushganda chaqiriladi. `accepting_orders=false` bo'lsa buyurtma tugmasini o'chiring va `support_phone` ni ko'rsating.
+      operationId: getMeta
+      security: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Meta' }
+
+  /auth/otp/send:
+    post:
+      tags: [Avtorizatsiya]
+      summary: Mijozga SMS kod yuborish
+      description: |
+        Bitta raqamga 60 soniyada bir marta. Cheklov: telefon bo'yicha 3/daqiqa, IP bo'yicha 10/daqiqa.
+        Test rejimida SMS yuborilmaydi, kod har doim `1111`.
+      operationId: sendOtp
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phone]
+              properties:
+                phone: { type: string, example: '+998935550001' }
+      responses:
+        '200':
+          description: Kod yuborildi
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string, example: Kod yuborildi. }
+                  expires_in: { type: integer, description: Kodning amal qilish muddati (soniya), example: 300 }
+        '422': { $ref: '#/components/responses/UnprocessableEntity' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /auth/otp/verify:
+    post:
+      tags: [Avtorizatsiya]
+      summary: SMS kodni tasdiqlash (kirish yoki ro'yxatdan o'tish)
+      description: |
+        Raqam bazada bo'lmasa — yangi mijoz yaratiladi (`is_new: true`), ilova ism so'rab `PATCH /me` qilishi mumkin.
+        Kod bir martalik, 5 ta noto'g'ri urinishdan keyin yangi kod so'raladi.
+        Raqam kuryer/xodimga tegishli yoki mijoz bloklangan bo'lsa — 403.
+      operationId: verifyOtp
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phone, code]
+              properties:
+                phone: { type: string, example: '+998935550001' }
+                code: { type: string, pattern: '^\d{4,6}$', example: '1111' }
+                name: { type: string, maxLength: 100, description: Faqat yangi foydalanuvchi uchun, example: Malika }
+                device_name: { type: string, maxLength: 100, example: 'iPhone 15' }
+      responses:
+        '200':
+          description: Muvaffaqiyatli
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token: { type: string, example: '1|lGK5pOVMyATPd2G7fIDXhI5Z08JlfktcBYeThMR5b0cfe63a' }
+                  is_new: { type: boolean, example: false }
+                  user: { $ref: '#/components/schemas/User' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/UnprocessableEntity' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /auth/courier/login:
+    post:
+      tags: [Avtorizatsiya]
+      summary: Kuryer kirishi (telefon + parol)
+      description: Login va parolni administrator admin panelda beradi. Parol o'zgartirilsa yoki kuryer bloklansa, barcha tokenlari bekor bo'ladi.
+      operationId: courierLogin
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phone, password]
+              properties:
+                phone: { type: string, example: '+998901110001' }
+                password: { type: string, example: courier123 }
+                device_name: { type: string, maxLength: 100, example: 'Samsung A54' }
+      responses:
+        '200':
+          description: Muvaffaqiyatli
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token: { type: string, example: '2|a2KogKTEnLtqe4H9MgskXY1ap6E3PTuhKNhNyo9ye23a7554' }
+                  user: { $ref: '#/components/schemas/User' }
+        '401':
+          description: Telefon yoki parol noto'g'ri
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { message: "Telefon raqam yoki parol noto'g'ri." }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/UnprocessableEntity' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /auth/logout:
+    post:
+      tags: [Avtorizatsiya]
+      summary: Chiqish (joriy tokenni bekor qilish)
+      operationId: logout
+      responses:
+        '200': { $ref: '#/components/responses/Message' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /me:
+    get:
+      tags: [Profil]
+      summary: Joriy foydalanuvchi
+      operationId: getMe
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/User' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    patch:
+      tags: [Profil]
+      summary: Ismni o'zgartirish
+      operationId: updateMe
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string, minLength: 2, maxLength: 100, example: Malika Yusupova }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/User' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '422': { $ref: '#/components/responses/UnprocessableEntity' }
+
+  /notifications:
+    get:
+      tags: [Bildirishnomalar]
+      summary: Bildirishnomalar ro'yxati (yangilari birinchi)
+      description: Push kelmagan holat uchun ham — ilova ochilganda va orqa fonda 30–60 soniyada `unread_count` ni tekshiring.
+      operationId: listNotifications
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/Notification' }
+                  links: { $ref: '#/components/schemas/PaginationLinks' }
+                  meta: { $ref: '#/components/schemas/PaginationMeta' }
+                  unread_count: { type: integer, example: 3 }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /notifications/{id}/read:
+    post:
+      tags: [Bildirishnomalar]
+      summary: Bittasini o'qilgan deb belgilash
+      operationId: markNotificationRead
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { $ref: '#/components/responses/Message' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /notifications/read-all:
+    post:
+      tags: [Bildirishnomalar]
+      summary: Hammasini o'qilgan deb belgilash
+      operationId: markAllNotificationsRead
+      responses:
+        '200': { $ref: '#/components/responses/Message' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /devices:
+    post:
+      tags: [Bildirishnomalar]
+      summary: Push (FCM) tokenini saqlash
+      description: Har kirishda va FCM tokeni yangilanganda yuboring. Takroriy yuborish xavfsiz.
+      operationId: registerDevice
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DeviceTokenInput' }
+      responses:
+        '200': { $ref: '#/components/responses/Message' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '422': { $ref: '#/components/responses/UnprocessableEntity' }
+    delete:
+      tags: [Bildirishnomalar]
+      summary: Push tokenini o'chirish (chiqishdan oldin)
+      operationId: unregisterDevice
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DeviceTokenInput' }
+      responses:
+        '200': { $ref: '#/components/responses/Message' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /client/addresses:
+    get:
+      tags: [Mijoz — manzillar]
+      summary: Saqlangan manzillar
+      operationId: listAddresses
+      responses:
+        '200':
+          description: OK (sahifalanmaydi)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/Address' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Mijoz — manzillar]
+      summary: Manzil qo'shish
+      operationId: createAddress
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AddressInput' }
+      responses:
+        '201':
+          description: Yaratildi
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Address' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '422': { $ref: '#/components/responses/UnprocessableEntity' }
+
+  /client/addresses/{address}:
+    parameters:
+      - name: address
+        in: path
+        required: true
+        schema: { type: integer }
+    put:
+      tags: [Mijoz — manzillar]
+      summary: Manzilni yangilash (to'liq almashtirish)
+      operationId: updateAddress
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AddressInput' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Address' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/UnprocessableEntity' }
+    delete:
+      tags: [Mijoz — manzillar]
+      summary: Manzilni o'chirish
+      description: O'chirilgan manzil eski buyurtmalarga ta'sir qilmaydi (buyurtmada manzil nusxasi saqlanadi).
+      operationId: deleteAddress
+      responses:
+        '200': { $ref: '#/components/responses/Message' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /client/orders:
+    get:
+      tags: [Mijoz — buyurtmalar]
+      summary: Mening buyurtmalarim
+      operationId: listClientOrders
+      parameters:
+        - name: scope
+          in: query
+          description: '`active` — yakunlanmaganlar, `history` — yetkazilgan va bekor qilinganlar, bo''sh — hammasi'
+          schema: { type: string, enum: [active, history] }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200': { $ref: '#/components/responses/OrderList' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Mijoz — buyurtmalar]
+      summary: Buyurtma berish
+      description: |
+        Manzil: `address_id` (o'z saqlangan manzili) **yoki** `address` + ixtiyoriy maydonlar.
+
+        **Narx yuborilmaydi.** `price`, `total`, `delivery_fee` kabi maydonlar e'tiborsiz qoldiriladi:
+        yetkazish narxi sozlamadan olinadi, mahsulot narxini kuryer xariddan keyin kiritadi.
+        Shuning uchun yangi buyurtmada `amounts.items_total = 0`.
+
+        `Idempotency-Key` bilan qayta yuborilgan so'rov (24 soat) yangi buyurtma yaratmaydi — `200` va o'sha buyurtma qaytadi.
+
+        Biznes xatolar (422, `message`): buyurtma qabul qilish o'chirilgan; mahsulotlar soni chegaradan oshgan.
+      operationId: createOrder
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          description: Har bir yangi buyurtma uchun ilova yaratgan UUID
+          schema: { type: string, example: 3f0b8d2e-6a51-4c0e-9d7a-1f2b3c4d5e6f }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/OrderInput' }
+      responses:
+        '201': { $ref: '#/components/responses/OrderDetail' }
+        '200':
+          description: Shu `Idempotency-Key` bilan avval yaratilgan buyurtma
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Order' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/UnprocessableEntity' }
+
+  /client/orders/{order}:
+    get:
+      tags: [Mijoz — buyurtmalar]
+      summary: Buyurtma tafsiloti (mahsulotlar, kuryer, tarix bilan)
+      operationId: getClientOrder
+      parameters:
+        - $ref: '#/components/parameters/OrderId'
+      responses:
+        '200': { $ref: '#/components/responses/OrderDetail' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /client/orders/{order}/cancel:
+    post:
+      tags: [Mijoz — buyurtmalar]
+      summary: Buyurtmani bekor qilish
+      description: 'Faqat `pending`, `confirmed`, `assigned` holatlarida (`can_cancel: true`). Kuryer bozorlikni boshlagandan keyin — 422, operatorga qo''ng''iroq qilish kerak.'
+      operationId: cancelClientOrder
+      parameters:
+        - $ref: '#/components/parameters/OrderId'
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReasonInput' }
+      responses:
+        '200': { $ref: '#/components/responses/OrderDetail' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/UnprocessableEntity' }
+
+  /courier/online:
+    patch:
+      tags: [Kuryer — holat]
+      summary: Ishga chiqdim / dam olyapman
+      description: Onlayn kuryerlar moderatorga ro'yxatning tepasida ko'rinadi.
+      operationId: setCourierOnline
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [is_online]
+              properties:
+                is_online: { type: boolean, example: true }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/User' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/UnprocessableEntity' }
+
+  /courier/location:
+    post:
+      tags: [Kuryer — holat]
+      summary: Joriy joylashuv
+      description: Onlayn paytda har 30–60 soniyada. Moderator kuryer tanlaganda masofa shundan hisoblanadi (kelajakda — avtomatik taqsimlash).
+      operationId: updateCourierLocation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [lat, lng]
+              properties:
+                lat: { type: number, format: double, minimum: -90, maximum: 90, example: 41.3111 }
+                lng: { type: number, format: double, minimum: -180, maximum: 180, example: 69.2797 }
+      responses:
+        '200': { $ref: '#/components/responses/Message' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/UnprocessableEntity' }
+
+  /courier/orders:
+    get:
+      tags: [Kuryer — buyurtmalar]
+      summary: Menga biriktirilgan buyurtmalar
+      operationId: listCourierOrders
+      parameters:
+        - name: scope
+          in: query
+          description: '`active` (standart) — `assigned`, `shopping`, `delivering`; `history` — yetkazilgan va bekor qilinganlar'
+          schema: { type: string, enum: [active, history], default: active }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200': { $ref: '#/components/responses/OrderList' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /courier/orders/{order}:
+    get:
+      tags: [Kuryer — buyurtmalar]
+      summary: Buyurtma tafsiloti
+      description: Faqat o'ziga biriktirilgan buyurtma; boshqasi — 404. Javobda `client` (ism, telefon) bor.
+      operationId: getCourierOrder
+      parameters:
+        - $ref: '#/components/parameters/OrderId'
+      responses:
+        '200': { $ref: '#/components/responses/OrderDetail' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /courier/orders/{order}/accept:
+    post:
+      tags: [Kuryer — buyurtmalar]
+      summary: Qabul qilish — bozorlikni boshlash
+      description: '`assigned` → `shopping`. Mijozga "Kuryer bozorlikda" bildirishnomasi ketadi.'
+      operationId: acceptOrder
+      parameters:
+        - $ref: '#/components/parameters/OrderId'
+      responses:
+        '200': { $ref: '#/components/responses/OrderDetail' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/UnprocessableEntity' }
+
+  /courier/orders/{order}/decline:
+    post:
+      tags: [Kuryer — buyurtmalar]
+      summary: Rad etish
+      description: '`assigned` → `confirmed`. Buyurtma moderatorga qaytadi, u boshqa kuryerni tanlaydi. Shundan keyin bu buyurtma kuryerga ko''rinmaydi.'
+      operationId: declineOrder
+      parameters:
+        - $ref: '#/components/parameters/OrderId'
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReasonInput' }
+      responses:
+        '200': { $ref: '#/components/responses/Message' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/UnprocessableEntity' }
+
+  /courier/orders/{order}/items/{item}:
+    patch:
+      tags: [Kuryer — buyurtmalar]
+      summary: Mahsulotni belgilash (olindi / topilmadi)
+      description: |
+        Faqat `shopping` holatida. `purchased` uchun `price` — shu qator uchun to'langan **jami** summa (so'm).
+        `unavailable` bo'lsa `price` e'tiborsiz. Qayta yuborib o'zgartirish mumkin. Har o'zgarishda buyurtma `amounts` qayta hisoblanadi.
+      operationId: updateOrderItem
+      parameters:
+        - $ref: '#/components/parameters/OrderId'
+        - name: item
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { type: string, enum: [purchased, unavailable] }
+                price: { type: integer, minimum: 1, maximum: 100000000, description: '`status=purchased` bo''lsa majburiy', example: 18000 }
+                courier_note: { type: string, maxLength: 255, example: "O'rniga boshqa navi olindi" }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/OrderItem' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/UnprocessableEntity' }
+
+  /courier/orders/{order}/purchase-complete:
+    post:
+      tags: [Kuryer — buyurtmalar]
+      summary: Bozorlikni tugatish — mijozga yo'l olish
+      description: |
+        `shopping` → `delivering`. Barcha mahsulotlar belgilangan va kamida bittasi `purchased` bo'lishi kerak.
+        Chek rasmi ixtiyoriy (`multipart/form-data`). Javobda yakuniy `amounts.total` — mijozdan olinadigan summa.
+      operationId: completePurchase
+      parameters:
+        - $ref: '#/components/parameters/OrderId'
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                receipt: { type: string, format: binary, description: 'jpg, jpeg, png, webp; ≤ 5 MB' }
+      responses:
+        '200': { $ref: '#/components/responses/OrderDetail' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/UnprocessableEntity' }
+
+  /courier/orders/{order}/deliver:
+    post:
+      tags: [Kuryer — buyurtmalar]
+      summary: Yetkazildi
+      description: '`delivering` → `delivered`. Naqd to''lovda buyurtma `payment.status = paid` bo''ladi.'
+      operationId: deliverOrder
+      parameters:
+        - $ref: '#/components/parameters/OrderId'
+      responses:
+        '200': { $ref: '#/components/responses/OrderDetail' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/UnprocessableEntity' }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: Sanctum token, masalan `1|lGK5pOVMyATPd2G7fIDXhI5Z08JlfktcBYeThMR5b0cfe63a`
+
+  parameters:
+    OrderId:
+      name: order
+      in: path
+      required: true
+      schema: { type: integer, example: 7 }
+    Page:
+      name: page
+      in: query
+      schema: { type: integer, minimum: 1, default: 1 }
+    Limit:
+      name: limit
+      in: query
+      description: Sahifadagi elementlar soni
+      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+
+  responses:
+    Message:
+      description: OK
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { message: Saqlandi. }
+    Unauthorized:
+      description: Token yo'q yoki yaroqsiz — login sahifasiga qayting
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { message: "Avtorizatsiyadan o'tilmagan." }
+    Forbidden:
+      description: Rol mos emas (masalan, mijoz tokeni bilan kuryer endpointi) yoki akkaunt bloklangan
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { message: "Bu bo'limga kirish huquqingiz yo'q." }
+    NotFound:
+      description: Topilmadi yoki boshqa foydalanuvchiga tegishli
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { message: Topilmadi. }
+    UnprocessableEntity:
+      description: |
+        Validatsiya xatosi (`errors` bilan) yoki biznes qoida buzilgan (faqat `message`, masalan noto'g'ri holat o'tishi).
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ValidationError' }
+          examples:
+            validation:
+              summary: Validatsiya
+              value:
+                message: Manzilni kiriting yoki saqlangan manzilni tanlang. (yana 1 ta xato)
+                errors:
+                  address: [Manzilni kiriting yoki saqlangan manzilni tanlang.]
+                  items: ["Kamida bitta mahsulot qo'shing."]
+            rule:
+              summary: Biznes qoida
+              value:
+                message: "Buyurtmani «Bozorlik qilinmoqda» holatidan «Yetkazildi» holatiga o'tkazib bo'lmaydi."
+    TooManyRequests:
+      description: Juda ko'p so'rov — `Retry-After` header'idagi soniyadan keyin
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { message: "Juda ko'p urinish. Birozdan keyin qayta urinib ko'ring." }
+    OrderDetail:
+      description: Buyurtma (`items` va `history` bilan)
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              data: { $ref: '#/components/schemas/Order' }
+    OrderList:
+      description: Buyurtmalar ro'yxati (`items` o'rniga `items_count`)
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              data:
+                type: array
+                items: { $ref: '#/components/schemas/Order' }
+              links: { $ref: '#/components/schemas/PaginationLinks' }
+              meta: { $ref: '#/components/schemas/PaginationMeta' }
+
+  schemas:
+    Error:
+      type: object
+      required: [message]
+      properties:
+        message: { type: string }
+
+    ValidationError:
+      type: object
+      required: [message]
+      properties:
+        message: { type: string }
+        errors:
+          type: object
+          description: Maydon nomi → xabarlar. Massiv elementlari `items.0.unit` ko'rinishida.
+          additionalProperties:
+            type: array
+            items: { type: string }
+
+    Option:
+      type: object
+      required: [value, label]
+      properties:
+        value: { type: string }
+        label: { type: string }
+
+    Meta:
+      type: object
+      properties:
+        accepting_orders: { type: boolean, example: true }
+        delivery_fee: { type: integer, example: 15000 }
+        service_fee: { type: integer, example: 0 }
+        max_items_per_order: { type: integer, example: 50 }
+        support_phone: { type: string, example: '+998 90 000 00 00' }
+        units:
+          type: array
+          items: { $ref: '#/components/schemas/Option' }
+          example:
+            - { value: pcs, label: dona }
+            - { value: kg, label: kg }
+            - { value: g, label: gramm }
+            - { value: l, label: litr }
+            - { value: pack, label: qadoq }
+            - { value: bunch, label: "bog'" }
+        payment_methods:
+          type: array
+          items: { $ref: '#/components/schemas/Option' }
+          example: [{ value: cash, label: Naqd (kuryerga) }]
+        order_statuses:
+          type: array
+          items: { $ref: '#/components/schemas/Option' }
+
+    User:
+      type: object
+      properties:
+        id: { type: integer, example: 6 }
+        name: { type: string, example: Malika Yusupova }
+        phone: { type: string, example: '+998935550001' }
+        role: { type: string, enum: [client, courier] }
+        courier:
+          allOf: [{ $ref: '#/components/schemas/CourierProfile' }]
+          description: Faqat `role=courier` bo'lsa
+        created_at: { type: string, format: date-time }
+
+    CourierProfile:
+      type: object
+      properties:
+        vehicle:
+          allOf: [{ $ref: '#/components/schemas/Option' }]
+          description: 'foot | bicycle | scooter | car'
+          example: { value: scooter, label: Skuter / moto }
+        vehicle_number: { type: string, nullable: true, example: 01 A 123 BC }
+        is_online: { type: boolean }
+        last_location_at: { type: string, format: date-time, nullable: true }
+
+    AddressInput:
+      type: object
+      required: [address]
+      properties:
+        title: { type: string, maxLength: 60, nullable: true, example: Uy }
+        address: { type: string, maxLength: 255, example: 'Chilonzor 9-kvartal, 12-uy' }
+        entrance: { type: string, maxLength: 20, nullable: true, example: '2' }
+        floor: { type: string, maxLength: 20, nullable: true, example: '4' }
+        apartment: { type: string, maxLength: 20, nullable: true, example: '38' }
+        landmark: { type: string, maxLength: 255, nullable: true, example: Maktab ro'parasi }
+        lat: { type: number, format: double, nullable: true, description: '`lng` bilan birga', example: 41.2856 }
+        lng: { type: number, format: double, nullable: true, description: '`lat` bilan birga', example: 69.2034 }
+
+    Address:
+      allOf:
+        - type: object
+          properties:
+            id: { type: integer, example: 1 }
+        - $ref: '#/components/schemas/AddressInput'
+
+    OrderItemInput:
+      type: object
+      required: [name, quantity, unit]
+      properties:
+        name: { type: string, minLength: 2, maxLength: 150, example: Kartoshka }
+        quantity: { type: number, exclusiveMinimum: true, minimum: 0, maximum: 1000, example: 3 }
+        unit: { type: string, enum: [pcs, kg, g, l, pack, bunch], example: kg }
+        note: { type: string, maxLength: 255, nullable: true, example: Yirik bo'lsin }
+
+    OrderInput:
+      type: object
+      required: [items]
+      properties:
+        address_id: { type: integer, description: 'O''z saqlangan manzili. Berilsa, quyidagi manzil maydonlari e''tiborsiz', example: 1 }
+        address: { type: string, maxLength: 255, description: '`address_id` bo''lmasa majburiy', example: 'Yunusobod 4-kvartal, 15-uy' }
+        entrance: { type: string, maxLength: 20 }
+        floor: { type: string, maxLength: 20, example: '4' }
+        apartment: { type: string, maxLength: 20, example: '38' }
+        landmark: { type: string, maxLength: 255, example: Makro yonida }
+        lat: { type: number, format: double, example: 41.364 }
+        lng: { type: number, format: double, example: 69.287 }
+        items:
+          type: array
+          minItems: 1
+          maxItems: 50
+          description: Maksimal soni — `GET /meta` → `max_items_per_order`
+          items: { $ref: '#/components/schemas/OrderItemInput' }
+        payment_method: { type: string, enum: [cash], default: cash, description: Hozircha faqat naqd }
+        contact_name: { type: string, maxLength: 100, description: Standart — profil ismi }
+        contact_phone: { type: string, description: Standart — profil telefoni, example: '+998935550001' }
+        note: { type: string, maxLength: 1000, example: Domofon ishlamaydi }
+
+    OrderItem:
+      type: object
+      properties:
+        id: { type: integer, example: 23 }
+        name: { type: string, example: Kartoshka }
+        quantity: { type: number, example: 3 }
+        unit:
+          allOf: [{ $ref: '#/components/schemas/Option' }]
+          example: { value: kg, label: kg }
+        note: { type: string, nullable: true }
+        status:
+          allOf: [{ $ref: '#/components/schemas/Option' }]
+          description: 'pending (Kutilmoqda) | purchased (Olindi) | unavailable (Topilmadi)'
+          example: { value: purchased, label: Olindi }
+        price: { type: integer, nullable: true, description: Kuryer to'lagan qator summasi, example: 24000 }
+        courier_note: { type: string, nullable: true }
+
+    OrderHistory:
+      type: object
+      properties:
+        status:
+          allOf: [{ $ref: '#/components/schemas/Option' }]
+          example: { value: confirmed, label: Tasdiqlandi }
+        comment: { type: string, nullable: true }
+        created_at: { type: string, format: date-time }
+
+    Order:
+      type: object
+      properties:
+        id: { type: integer, example: 7 }
+        number: { type: string, example: D000007 }
+        status:
+          allOf: [{ $ref: '#/components/schemas/Option' }]
+          description: 'pending | confirmed | assigned | shopping | delivering | delivered | cancelled'
+          example: { value: pending, label: Yangi }
+        address:
+          type: object
+          properties:
+            address: { type: string, example: 'Yunusobod 4-kvartal, 15-uy' }
+            entrance: { type: string, nullable: true }
+            floor: { type: string, nullable: true, example: '4' }
+            apartment: { type: string, nullable: true, example: '38' }
+            landmark: { type: string, nullable: true, example: Makro yonida }
+            lat: { type: number, nullable: true, example: 41.364 }
+            lng: { type: number, nullable: true, example: 69.287 }
+        contact:
+          type: object
+          properties:
+            name: { type: string, example: Malika Yusupova }
+            phone: { type: string, example: '+998935550001' }
+        note: { type: string, nullable: true, example: Domofon ishlamaydi }
+        items_count: { type: integer, description: Faqat ro'yxatda, example: 2 }
+        items:
+          type: array
+          description: Faqat tafsilotda
+          items: { $ref: '#/components/schemas/OrderItem' }
+        amounts:
+          type: object
+          properties:
+            items_total: { type: integer, description: Kuryer kiritgan narxlar yig'indisi (bozorlikdan oldin 0), example: 0 }
+            delivery_fee: { type: integer, example: 15000 }
+            service_fee: { type: integer, example: 0 }
+            total: { type: integer, description: 'items_total + delivery_fee + service_fee', example: 15000 }
+        payment:
+          type: object
+          properties:
+            method:
+              allOf: [{ $ref: '#/components/schemas/Option' }]
+              example: { value: cash, label: Naqd (kuryerga) }
+            status:
+              allOf: [{ $ref: '#/components/schemas/Option' }]
+              description: 'unpaid | paid | refunded'
+              example: { value: unpaid, label: "To'lanmagan" }
+        receipt_url: { type: string, nullable: true, description: Chek rasmi (kuryer yuklagan bo'lsa) }
+        courier:
+          type: object
+          description: Faqat mijozga va kuryer biriktirilgan bo'lsa
+          properties:
+            name: { type: string, example: Jasur Karimov }
+            phone: { type: string, example: '+998901110001' }
+        client:
+          type: object
+          description: Faqat kuryerga
+          properties:
+            name: { type: string }
+            phone: { type: string }
+        can_cancel: { type: boolean, description: Faqat mijozga — bekor qilish tugmasini ko'rsatish }
+        cancel_reason: { type: string, nullable: true }
+        history:
+          type: array
+          description: Faqat tafsilotda, eskisidan yangisiga
+          items: { $ref: '#/components/schemas/OrderHistory' }
+        created_at: { type: string, format: date-time }
+        confirmed_at: { type: string, format: date-time, nullable: true }
+        assigned_at: { type: string, format: date-time, nullable: true }
+        delivered_at: { type: string, format: date-time, nullable: true }
+        cancelled_at: { type: string, format: date-time, nullable: true }
+
+    Notification:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        title: { type: string, example: Buyurtma tasdiqlandi }
+        body: { type: string, example: D000007 buyurtmangiz qabul qilindi. Tez orada kuryer biriktiriladi. }
+        order_id: { type: integer, nullable: true, example: 7 }
+        read: { type: boolean, example: false }
+        created_at: { type: string, format: date-time }
+
+    DeviceTokenInput:
+      type: object
+      required: [token]
+      properties:
+        token: { type: string, maxLength: 500, example: 'fcm-token-xyz' }
+        platform: { type: string, enum: [android, ios] }
+
+    ReasonInput:
+      type: object
+      properties:
+        reason: { type: string, maxLength: 255, example: Rejalar o'zgardi }
+
+    PaginationLinks:
+      type: object
+      properties:
+        first: { type: string, nullable: true }
+        last: { type: string, nullable: true }
+        prev: { type: string, nullable: true }
+        next: { type: string, nullable: true }
+
+    PaginationMeta:
+      type: object
+      properties:
+        current_page: { type: integer, example: 1 }
+        from: { type: integer, nullable: true, example: 1 }
+        last_page: { type: integer, example: 3 }
+        per_page: { type: integer, example: 20 }
+        to: { type: integer, nullable: true, example: 20 }
+        total: { type: integer, example: 47 }
+
+security:
+  - bearerAuth: []

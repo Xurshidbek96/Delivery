@@ -3,5 +3,7 @@
     "Unauthenticated.": "Avtorizatsiyadan o'tilmagan.",
     "This action is unauthorized.": "Bu amalni bajarishga ruxsatingiz yo'q.",
     "Not Found": "Topilmadi",
-    "Server Error": "Server xatosi"
+    "Server Error": "Server xatosi",
+    "(and :count more error)": "(yana :count ta xato)",
+    "(and :count more errors)": "(yana :count ta xato)"
 }

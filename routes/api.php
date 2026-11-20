@@ -43,7 +43,10 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
 
         // --- Mijoz ilovasi ---
         Route::middleware('role:client')->prefix('client')->name('client.')->group(function () {
-            Route::apiResource('addresses', AddressController::class)->except('show')->whereNumber('address');
+            Route::get('addresses', [AddressController::class, 'index'])->name('addresses.index');
+            Route::post('addresses', [AddressController::class, 'store'])->name('addresses.store');
+            Route::put('addresses/{address}', [AddressController::class, 'update'])->whereNumber('address')->name('addresses.update');
+            Route::delete('addresses/{address}', [AddressController::class, 'destroy'])->whereNumber('address')->name('addresses.destroy');
 
             Route::get('orders', [ClientOrderController::class, 'index'])->name('orders.index');
             Route::post('orders', [ClientOrderController::class, 'store'])->name('orders.store');

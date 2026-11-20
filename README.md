@@ -2,9 +2,16 @@
 
 Bozorlik va yetkazib berish xizmati: mijoz ilovada xaridlar ro'yxatini yuboradi → moderator admin panelda tasdiqlaydi va kuryerni tanlaydi → kuryer bozordan sotib olib, mijozga yetkazadi.
 
-- **Mijoz ilovasi** va **kuryer ilovasi** — REST API (`/api/v1`, Laravel Sanctum). Hujjat: [docs/api.md](docs/api.md)
+- **Mijoz ilovasi** va **kuryer ilovasi** — REST API (`/api/v1`, Laravel Sanctum)
 - **Admin panel** — `/admin` (moderator va administrator)
-- Arxitektura: [docs/architecture.md](docs/architecture.md) · Holatlar: [docs/order-status-flow.md](docs/order-status-flow.md)
+
+| Hujjat | Kim uchun |
+|---|---|
+| [TZ.md](TZ.md) | Texnik topshiriq — buyurtmachi va jamoa |
+| [docs/api.md](docs/api.md) | Mobil dasturchilar qo'llanmasi |
+| Swagger — `/docs/api` ([docs/openapi.yaml](docs/openapi.yaml)) | Interaktiv API spetsifikatsiyasi |
+| [docs/postman/](docs/postman/) | Postman collection + environment (generator: `tools/postman/build_collection.py`) |
+| [docs/architecture.md](docs/architecture.md), [docs/order-status-flow.md](docs/order-status-flow.md) | Backend dasturchilar |
 
 Stek: Laravel 12, PHP 8.2+, MySQL/MariaDB, Blade (build qadamisiz). To'lov: hozircha naqd; Click/Payme uchun joy tayyor.
 
@@ -41,5 +48,5 @@ vendor/bin/pint                       # kod formati
 2. `composer install --no-dev --optimize-autoloader`
 3. `php artisan migrate --force && php artisan db:seed --class=StaffSeeder --force` (faqat administrator; demo kerak bo'lsa `db:seed --force`)
 4. `php artisan storage:link && php artisan config:cache && php artisan route:cache && php artisan view:cache`
-5. Web root → `public/`. Navbat ishchisi hozir shart emas (bildirishnomalar sinxron).
+5. Web root → `public/`. Swagger (`/docs/api`) kerak bo'lmasa `API_DOCS_ENABLED=false`. Navbat ishchisi hozir shart emas (bildirishnomalar sinxron).
 6. Administrator bilan kirib parolni darhol almashtiring (Profil).

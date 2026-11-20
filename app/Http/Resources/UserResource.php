@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Enums\UserRole;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -16,7 +17,11 @@ class UserResource extends JsonResource
             'name' => $this->name,
             'phone' => $this->phone,
             'role' => $this->role->value,
-            'courier' => new CourierProfileResource($this->whenLoaded('courierProfile')),
+            // Faqat kuryerda: transport va onlayn holati
+            'courier' => $this->when(
+                $this->role === UserRole::Courier,
+                fn () => new CourierProfileResource($this->courierProfile),
+            ),
             'created_at' => $this->created_at?->toIso8601String(),
         ];
     }

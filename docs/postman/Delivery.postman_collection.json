@@ -1,0 +1,1585 @@
+{
+  "info": {
+    "_postman_id": "bc20e5b9-5cf2-55dc-bf89-c8dc26600329",
+    "name": "Delivery API v1",
+    "description": "Bozorlik va yetkazib berish — mijoz va kuryer ilovalari API.\n\n**Boshlash:**\n1. Environment tanlang (`Delivery — Local`).\n2. `1. Avtorizatsiya` papkasini ishga tushiring — `client_token` va `courier_token` avtomatik saqlanadi.\n3. `3. Mijoz ilovasi → Buyurtma berish`.\n4. Admin panelda (`/admin`, moderator `+998900000002` / `moderator123`) buyurtmani tasdiqlang va kuryerni tanlang.\n5. `4. Kuryer ilovasi` — qabul qilish → mahsulotlarni belgilash → bozorlikni tugatish → yetkazildi.\n\nJavob formati, xatolar va qoidalar: `docs/api.md`, Swagger: `/docs/api`.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "pm.test('JSON javob', () => pm.response.to.be.json);"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "client_token",
+      "value": ""
+    },
+    {
+      "key": "courier_token",
+      "value": ""
+    },
+    {
+      "key": "order_id",
+      "value": ""
+    },
+    {
+      "key": "courier_order_id",
+      "value": ""
+    },
+    {
+      "key": "item_id",
+      "value": ""
+    },
+    {
+      "key": "address_id",
+      "value": ""
+    },
+    {
+      "key": "notification_id",
+      "value": ""
+    },
+    {
+      "key": "idempotency_key",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "id": "71eac802-a3f5-596c-bfa8-2632e2044757",
+      "name": "1. Avtorizatsiya",
+      "description": "Avval shu papkani ishga tushiring — tokenlar o'zgaruvchilarga saqlanadi.",
+      "item": [
+        {
+          "id": "eeff1894-0a1f-5034-baed-2ce95952fec0",
+          "name": "Mijoz — SMS kod yuborish",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('expires_in bor', () => pm.expect(pm.response.json().expires_in).to.be.a('number'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/otp/send",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "otp",
+                "send"
+              ]
+            },
+            "description": "Test rejimida SMS yuborilmaydi, kod `{{otp_code}}` (1111). Bir raqamga 60 soniyada bir marta.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"{{client_phone}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "id": "07e82e6a-bf69-5689-95e8-596bfd6e2bdf",
+          "name": "Mijoz — kodni tasdiqlash (token)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "if (pm.response.code < 300) { pm.collectionVariables.set('client_token', pm.response.json().token); }",
+                  "pm.test('rol: client', () => pm.expect(pm.response.json().user.role).to.eql('client'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/otp/verify",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "otp",
+                "verify"
+              ]
+            },
+            "description": "Token avtomatik `client_token` ga saqlanadi.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"{{client_phone}}\",\n  \"code\": \"{{otp_code}}\",\n  \"name\": \"Postman Mijoz\",\n  \"device_name\": \"Postman\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "id": "9cf8e5c8-2d81-5a67-962a-2482cdc97bfe",
+          "name": "Kuryer — kirish (token)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "if (pm.response.code < 300) { pm.collectionVariables.set('courier_token', pm.response.json().token); }",
+                  "pm.test('rol: courier', () => pm.expect(pm.response.json().user.role).to.eql('courier'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/courier/login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "courier",
+                "login"
+              ]
+            },
+            "description": "Token avtomatik `courier_token` ga saqlanadi. Login/parolni admin panel → Kuryerlar bo'limida administrator beradi.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"{{courier_phone}}\",\n  \"password\": \"{{courier_password}}\",\n  \"device_name\": \"Postman\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "bb65ade6-ac9b-51fd-b37d-8c49fa5e6e2a",
+      "name": "2. Umumiy (mijoz tokeni bilan)",
+      "description": "Bu endpointlar kuryer uchun ham bir xil — kuryer sifatida tekshirish uchun papka Authorization'ida `{{courier_token}}` qo'ying.",
+      "item": [
+        {
+          "id": "9acd7931-a2f1-5455-a9a4-b18ccfd14bdd",
+          "name": "Ilova sozlamalari (meta)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('birliklar ro\\'yxati', () => pm.expect(pm.response.json().units).to.be.an('array').that.is.not.empty);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/meta",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "meta"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "id": "a2cb069a-848e-5c69-b941-03ff9511d90e",
+          "name": "Profil",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/me",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "me"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "id": "14409b10-626d-5988-8daf-7f96a0cba4e6",
+          "name": "Ismni o'zgartirish",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/me",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "me"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Malika Yusupova\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "id": "d15ff4d6-ab4a-57a1-9c57-b0d9ab300409",
+          "name": "Bildirishnomalar",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('unread_count bor', () => pm.expect(pm.response.json()).to.have.property('unread_count'));",
+                  "const n = pm.response.json().data[0]; if (n) pm.collectionVariables.set('notification_id', n.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/notifications?limit=20&page=1",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "notifications"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "description": "1..100"
+                },
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "id": "5a8c7b73-db2f-58c4-9892-de3b9f65e320",
+          "name": "Bildirishnomani o'qildi qilish",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/notifications/{{notification_id}}/read",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "notifications",
+                "{{notification_id}}",
+                "read"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "id": "17d9e41e-12fc-5cff-a2e9-62c0b17d268d",
+          "name": "Hammasini o'qildi qilish",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/notifications/read-all",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "notifications",
+                "read-all"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "id": "c6edfe10-2cf3-5a89-9964-cf45fd69d23a",
+          "name": "Push tokenini saqlash",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/devices",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "devices"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"postman-fcm-token\",\n  \"platform\": \"android\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "id": "849d4cb5-54f4-5160-8c76-49d7f9c36d2e",
+          "name": "Push tokenini o'chirish",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/devices",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "devices"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"postman-fcm-token\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ],
+      "auth": {
+        "type": "bearer",
+        "bearer": [
+          {
+            "key": "token",
+            "value": "{{client_token}}",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "id": "65a8e2d2-db7d-57d0-975e-d86009d8296b",
+      "name": "3. Mijoz ilovasi",
+      "description": "",
+      "item": [
+        {
+          "id": "3ae396c4-80b6-57a7-a485-c6bed8cee6d1",
+          "name": "Manzillar",
+          "description": "",
+          "item": [
+            {
+              "id": "fed500df-388d-583c-8c35-aea285dbe04d",
+              "name": "Manzillar ro'yxati",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 200', () => pm.response.to.have.status(200));"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/client/addresses",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "client",
+                    "addresses"
+                  ]
+                },
+                "description": ""
+              }
+            },
+            {
+              "id": "57dcbbda-63c6-5f6c-9be2-018e01be4efe",
+              "name": "Manzil qo'shish",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 201', () => pm.response.to.have.status(201));",
+                      "if (pm.response.code < 300) { pm.collectionVariables.set('address_id', pm.response.json().data.id); }"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/client/addresses",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "client",
+                    "addresses"
+                  ]
+                },
+                "description": "",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"title\": \"Uy\",\n  \"address\": \"Chilonzor 9-kvartal, 12-uy\",\n  \"entrance\": \"2\",\n  \"floor\": \"4\",\n  \"apartment\": \"38\",\n  \"landmark\": \"Maktab ro'parasi\",\n  \"lat\": 41.2856,\n  \"lng\": 69.2034\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "id": "1e3fa6b5-99a7-5f9e-8093-2407458fa250",
+              "name": "Manzilni yangilash",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 200', () => pm.response.to.have.status(200));"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/client/addresses/{{address_id}}",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "client",
+                    "addresses",
+                    "{{address_id}}"
+                  ]
+                },
+                "description": "",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"title\": \"Uy\",\n  \"address\": \"Chilonzor 9-kvartal, 14-uy\",\n  \"floor\": \"5\",\n  \"lat\": 41.2856,\n  \"lng\": 69.2034\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "id": "e6484bdb-be86-554a-9229-62446b9cfc78",
+              "name": "Manzilni o'chirish",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 200', () => pm.response.to.have.status(200));"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/client/addresses/{{address_id}}",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "client",
+                    "addresses",
+                    "{{address_id}}"
+                  ]
+                },
+                "description": ""
+              }
+            }
+          ]
+        },
+        {
+          "id": "8c95c2d6-18ea-56c5-aca0-a9f6fee8a7ce",
+          "name": "Buyurtmalar",
+          "description": "",
+          "item": [
+            {
+              "id": "a6f78e93-fef4-5a61-888c-2029b9e929e3",
+              "name": "Buyurtma berish (manzil bilan)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 201', () => pm.response.to.have.status(201));",
+                      "if (pm.response.code < 300) { pm.collectionVariables.set('order_id', pm.response.json().data.id); }",
+                      "pm.test('holat: pending', () => pm.expect(pm.response.json().data.status.value).to.eql('pending'));",
+                      "pm.test('xarid summasi hali 0', () => pm.expect(pm.response.json().data.amounts.items_total).to.eql(0));"
+                    ]
+                  }
+                },
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "// Har yuborishda yangi kalit. Qayta yuborishni sinash uchun shu qatorni o'chirib qo'ying.",
+                      "pm.collectionVariables.set('idempotency_key', pm.variables.replaceIn('{{$guid}}'));"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Idempotency-Key",
+                    "value": "{{idempotency_key}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/client/orders",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "client",
+                    "orders"
+                  ]
+                },
+                "description": "Narx yuborilmaydi — `delivery_fee` serverda, mahsulot narxlarini kuryer kiritadi. Javobdagi `id` → `order_id`.\n\nKeyingi qadam: admin panelda (moderator) buyurtmani **tasdiqlang** va kuryerni (`+998901110001`) **tanlang**, so'ng 4-papkaga o'ting.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"address\": \"Yunusobod 4-kvartal, 15-uy\",\n  \"floor\": \"4\",\n  \"apartment\": \"38\",\n  \"landmark\": \"Makro yonida\",\n  \"lat\": 41.364,\n  \"lng\": 69.287,\n  \"items\": [\n    {\n      \"name\": \"Kartoshka\",\n      \"quantity\": 3,\n      \"unit\": \"kg\"\n    },\n    {\n      \"name\": \"Non\",\n      \"quantity\": 4,\n      \"unit\": \"pcs\",\n      \"note\": \"issiq bo'lsin\"\n    },\n    {\n      \"name\": \"Sut 3.2%\",\n      \"quantity\": 2,\n      \"unit\": \"l\"\n    }\n  ],\n  \"payment_method\": \"cash\",\n  \"note\": \"Domofon ishlamaydi\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "id": "ad813bd6-4fa9-5145-9b33-b8b76a88ad4c",
+              "name": "Buyurtma berish (saqlangan manzil)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 201', () => pm.response.to.have.status(201));",
+                      "if (pm.response.code < 300) { pm.collectionVariables.set('order_id', pm.response.json().data.id); }"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/client/orders",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "client",
+                    "orders"
+                  ]
+                },
+                "description": "Avval \"Manzil qo'shish\" ni bajaring.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"address_id\": \"{{address_id}}\",\n  \"items\": [\n    {\n      \"name\": \"Olma\",\n      \"quantity\": 2,\n      \"unit\": \"kg\"\n    }\n  ]\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "id": "57e4a10b-5dda-5e34-916a-cc6cfe80f763",
+              "name": "Mening buyurtmalarim",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 200', () => pm.response.to.have.status(200));"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/client/orders?scope=active&limit=20",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "client",
+                    "orders"
+                  ],
+                  "query": [
+                    {
+                      "key": "scope",
+                      "value": "active",
+                      "description": "active | history | (bo'sh — hammasi)"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "20",
+                      "description": "1..100"
+                    }
+                  ]
+                },
+                "description": ""
+              }
+            },
+            {
+              "id": "81b8a421-24ce-5c9d-adb3-6b22a816227c",
+              "name": "Buyurtma tafsiloti",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                      "pm.test('tarix bor', () => pm.expect(pm.response.json().data.history).to.be.an('array'));"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/client/orders/{{order_id}}",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "client",
+                    "orders",
+                    "{{order_id}}"
+                  ]
+                },
+                "description": ""
+              }
+            },
+            {
+              "id": "bdd6836d-6647-5e18-b28f-ba01f858b359",
+              "name": "Buyurtmani bekor qilish",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 200', () => pm.response.to.have.status(200));"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/client/orders/{{order_id}}/cancel",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "client",
+                    "orders",
+                    "{{order_id}}",
+                    "cancel"
+                  ]
+                },
+                "description": "Faqat kuryer bozorlikni boshlaguncha (`can_cancel: true`). Aks holda 422.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"reason\": \"Rejalar o'zgardi\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "auth": {
+        "type": "bearer",
+        "bearer": [
+          {
+            "key": "token",
+            "value": "{{client_token}}",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "id": "d602d784-58f5-5ef5-8957-c462a0d46eed",
+      "name": "4. Kuryer ilovasi",
+      "description": "",
+      "item": [
+        {
+          "id": "73731444-070b-502b-849a-3458226b91aa",
+          "name": "Ishga chiqdim (onlayn)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/courier/online",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "courier",
+                "online"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"is_online\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "id": "e5bd45d7-291d-5e6b-9882-af6bcc799d57",
+          "name": "Joylashuvni yuborish",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/courier/location",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "courier",
+                "location"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"lat\": 41.3111,\n  \"lng\": 69.2797\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "id": "d7803c54-aead-589f-98c1-9da30921cd15",
+          "name": "Faol buyurtmalarim",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "const o = pm.response.json().data[0]; if (o) pm.collectionVariables.set('courier_order_id', o.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/courier/orders?scope=active",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "courier",
+                "orders"
+              ],
+              "query": [
+                {
+                  "key": "scope",
+                  "value": "active",
+                  "description": "active | history"
+                }
+              ]
+            },
+            "description": "Birinchi buyurtma `courier_order_id` ga saqlanadi."
+          }
+        },
+        {
+          "id": "23078557-781c-50b2-9dc5-516b33386199",
+          "name": "Buyurtma tafsiloti",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "const it = (pm.response.json().data.items || [])[0]; if (it) pm.collectionVariables.set('item_id', it.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/courier/orders/{{courier_order_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "courier",
+                "orders",
+                "{{courier_order_id}}"
+              ]
+            },
+            "description": "Birinchi mahsulot `item_id` ga saqlanadi."
+          }
+        },
+        {
+          "id": "f45cb480-d344-5d1a-8184-c9c9dff2dd6b",
+          "name": "Qabul qilish (bozorlikni boshlash)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('holat: shopping', () => pm.expect(pm.response.json().data.status.value).to.eql('shopping'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/courier/orders/{{courier_order_id}}/accept",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "courier",
+                "orders",
+                "{{courier_order_id}}",
+                "accept"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "id": "e656175a-64f4-5d45-92be-dbc027b9fa44",
+          "name": "Rad etish",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/courier/orders/{{courier_order_id}}/decline",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "courier",
+                "orders",
+                "{{courier_order_id}}",
+                "decline"
+              ]
+            },
+            "description": "Faqat `assigned` holatida. Buyurtma moderatorga qaytadi.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Mashina buzildi\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "id": "d874566b-fc9f-512d-b606-05cb13a55e3c",
+          "name": "Mahsulot — olindi",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/courier/orders/{{courier_order_id}}/items/{{item_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "courier",
+                "orders",
+                "{{courier_order_id}}",
+                "items",
+                "{{item_id}}"
+              ]
+            },
+            "description": "`price` — shu qator uchun to'langan jami summa. Har bir mahsulot uchun `item_id` ni almashtirib takrorlang.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"purchased\",\n  \"price\": 18000,\n  \"courier_note\": null\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "id": "7e0747ad-65f3-517e-b2f6-81a13a85b0af",
+          "name": "Mahsulot — topilmadi",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/courier/orders/{{courier_order_id}}/items/{{item_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "courier",
+                "orders",
+                "{{courier_order_id}}",
+                "items",
+                "{{item_id}}"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"unavailable\",\n  \"courier_note\": \"Do'konda tugagan\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "id": "055c4861-7463-549f-ae30-9e8899fccf99",
+          "name": "Bozorlikni tugatish (chek bilan)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('holat: delivering', () => pm.expect(pm.response.json().data.status.value).to.eql('delivering'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/courier/orders/{{courier_order_id}}/purchase-complete",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "courier",
+                "orders",
+                "{{courier_order_id}}",
+                "purchase-complete"
+              ]
+            },
+            "description": "Hamma mahsulot belgilangan bo'lishi kerak. Javobdagi `amounts.total` — mijozdan olinadigan summa.",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "receipt",
+                  "type": "file",
+                  "src": [],
+                  "description": "jpg/png/webp, ≤5 MB (ixtiyoriy)"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "id": "d9eb273a-a181-5a03-b1d4-fb81493111ba",
+          "name": "Yetkazildi",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('to\\'langan', () => pm.expect(pm.response.json().data.payment.status.value).to.eql('paid'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/courier/orders/{{courier_order_id}}/deliver",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "courier",
+                "orders",
+                "{{courier_order_id}}",
+                "deliver"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "id": "78547cbd-01b8-5950-87a1-14d90cedf789",
+          "name": "Tarix",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/courier/orders?scope=history",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "courier",
+                "orders"
+              ],
+              "query": [
+                {
+                  "key": "scope",
+                  "value": "history",
+                  "description": ""
+                }
+              ]
+            },
+            "description": ""
+          }
+        }
+      ],
+      "auth": {
+        "type": "bearer",
+        "bearer": [
+          {
+            "key": "token",
+            "value": "{{courier_token}}",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "id": "5a573728-eab8-5dee-bc6f-928d98d07d57",
+      "name": "5. Chiqish",
+      "description": "",
+      "item": [
+        {
+          "id": "ffb41ba0-f3a2-5eca-a477-493767e661da",
+          "name": "Mijoz — chiqish",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/logout",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "logout"
+              ]
+            },
+            "description": "Token bekor bo'ladi; qaytadan 1-papka."
+          }
+        }
+      ],
+      "auth": {
+        "type": "bearer",
+        "bearer": [
+          {
+            "key": "token",
+            "value": "{{client_token}}",
+            "type": "string"
+          }
+        ]
+      }
+    }
+  ]
+}

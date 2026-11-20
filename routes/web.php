@@ -8,9 +8,16 @@ use App\Http\Controllers\Admin\OrderController;
 use App\Http\Controllers\Admin\ProfileController;
 use App\Http\Controllers\Admin\SettingController;
 use App\Http\Controllers\Admin\StaffController;
+use App\Http\Controllers\ApiDocsController;
 use Illuminate\Support\Facades\Route;
 
 Route::redirect('/', '/admin');
+
+// Mobil dasturchilar uchun API hujjati (config: delivery.api_docs.enabled)
+if (config('delivery.api_docs.enabled')) {
+    Route::get('docs/api', [ApiDocsController::class, 'ui'])->name('docs.api');
+    Route::get('docs/openapi.yaml', [ApiDocsController::class, 'spec'])->name('docs.spec');
+}
 
 Route::prefix('admin')->name('admin.')->group(function () {
     Route::middleware('guest')->group(function () {
