@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Serverdagi deploy (delivery.firstcoder.uz). GitHub Actions SSH orqali chaqiradi:
+# Serverdagi deploy (delivery-5-9-0-240.sslip.io). GitHub Actions SSH orqali chaqiradi:
 # authorized_keys'da shu kalit uchun `command="…/deploy/deploy.sh"` — kalit boshqa buyruq bajara olmaydi.
-# Qo'lda: bash ~/web/delivery.firstcoder.uz/public_html/deploy/deploy.sh
+# Qo'lda: bash ~/web/delivery-5-9-0-240.sslip.io/public_html/deploy/deploy.sh
 #
 # Butun tana funksiya ichida: `git merge` shu faylni yangilasa ham bash eski nusxani oxirigacha bajaradi.
 

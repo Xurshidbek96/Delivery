@@ -51,11 +51,12 @@ vendor/bin/pint                       # kod formati
 5. Web root → `public/`. Swagger (`/docs/api`) kerak bo'lmasa `API_DOCS_ENABLED=false`. Navbat ishchisi hozir shart emas (bildirishnomalar sinxron).
 6. Administrator bilan kirib parolni darhol almashtiring (Profil).
 
-## Avtodeploy (delivery.firstcoder.uz)
+## Avtodeploy (https://delivery-5-9-0-240.sslip.io)
 
 `main` ga push → GitHub Actions ([.github/workflows/deploy.yml](.github/workflows/deploy.yml)): Pint + testlar (SQLite va MariaDB) → o'tsa SSH orqali serverda [deploy/deploy.sh](deploy/deploy.sh) ishga tushadi (`git merge --ff-only`, `composer install --no-dev`, `migrate --force`, `optimize`). PR'larda faqat testlar.
 
-- Server: HestiaCP `ruslan.firstcoders.uz`, foydalanuvchi `beeeexpress`, papka `~/web/delivery.firstcoder.uz/public_html` (nginx `laravel` shabloni, PHP 8.4), baza `beeeexpress_delivery`.
+- Server: HestiaCP `ruslan.firstcoders.uz`, foydalanuvchi `beeeexpress`, papka `~/web/delivery-5-9-0-240.sslip.io/public_html` (nginx `laravel` shabloni, PHP 8.4), baza `beeeexpress_delivery`.
+- Domen: `firstcoder.uz` zonasiga DNS yozuv qo'shish imkoni bo'lmagani uchun [sslip.io](https://sslip.io) (IP'dan avtomatik DNS) ishlatilgan; SSL — Let's Encrypt (Hestia avtomatik yangilaydi). Haqiqiy domenga o'tish: A-yozuv → `5.9.0.240`, Hestia'da domenni qo'shib papkani ko'chirish, `.env` `APP_URL`, `authorized_keys` dagi `command=` yo'li va workflow `url`.
 - Secret'lar: `DEPLOY_SSH_KEY`, `DEPLOY_KNOWN_HOSTS`. Serverdagi bu kalit `authorized_keys` da `command=` bilan cheklangan — faqat `deploy.sh` ni bajaradi.
 - `.env` va `storage/` serverda turadi, repoga kirmaydi. Serverda tracked faylni qo'lda o'zgartirsangiz deploy to'xtaydi (jimgina yo'qolmasligi uchun).
 - Qo'lda qayta deploy: GitHub → Actions → Delivery → Run workflow.

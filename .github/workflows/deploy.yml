@@ -73,7 +73,7 @@ jobs:
     if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     environment:
       name: production
-      url: https://delivery.firstcoder.uz
+      url: https://delivery-5-9-0-240.sslip.io
 
     steps:
       - name: Deploy (SSH)
