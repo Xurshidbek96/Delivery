@@ -192,7 +192,7 @@ def env(name, base):
             "values": [{"key": k, "value": v, "type": t, "enabled": True} for k, v, t in vals]}
 
 json.dump(env("Delivery — Local", "http://127.0.0.1:8000/api/v1"), open(f"{OUT}/Delivery.local.postman_environment.json", "w"), ensure_ascii=False, indent=2)
-json.dump(env("Delivery — Test server", "https://CHANGE-ME.example.uz/api/v1"), open(f"{OUT}/Delivery.test.postman_environment.json", "w"), ensure_ascii=False, indent=2)
+json.dump(env("Delivery — Test server", "https://delivery-5-9-0-240.sslip.io/api/v1"), open(f"{OUT}/Delivery.test.postman_environment.json", "w"), ensure_ascii=False, indent=2)
 
 def walk(items):
     for i in items:

@@ -6,7 +6,8 @@ Postman: [postman/](postman/) papkasi (6-bo'lim).
 
 | | |
 |---|---|
-| Baza URL | `https://<server>/api/v1` (lokal: `http://127.0.0.1:8000/api/v1`) |
+| Baza URL | Test server: `https://delivery-5-9-0-240.sslip.io/api/v1` (lokal: `http://127.0.0.1:8000/api/v1`) |
+| Swagger | https://delivery-5-9-0-240.sslip.io/docs/api |
 | Format | JSON, UTF-8. Har so'rovda `Accept: application/json` |
 | Avtorizatsiya | `Authorization: Bearer <token>` (Laravel Sanctum, muddatsiz — chiqishgacha) |
 | Vaqt | ISO 8601, `+05:00` (O'zbekiston vaqti) |

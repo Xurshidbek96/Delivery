@@ -25,6 +25,8 @@ info:
 servers:
   - url: /api/v1
     description: Joriy server
+  - url: https://delivery-5-9-0-240.sslip.io/api/v1
+    description: Test server
   - url: http://127.0.0.1:8000/api/v1
     description: Lokal (php artisan serve)
 tags:
