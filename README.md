@@ -50,3 +50,12 @@ vendor/bin/pint                       # kod formati
 4. `php artisan storage:link && php artisan config:cache && php artisan route:cache && php artisan view:cache`
 5. Web root → `public/`. Swagger (`/docs/api`) kerak bo'lmasa `API_DOCS_ENABLED=false`. Navbat ishchisi hozir shart emas (bildirishnomalar sinxron).
 6. Administrator bilan kirib parolni darhol almashtiring (Profil).
+
+## Avtodeploy (delivery.firstcoder.uz)
+
+`main` ga push → GitHub Actions ([.github/workflows/deploy.yml](.github/workflows/deploy.yml)): Pint + testlar (SQLite va MariaDB) → o'tsa SSH orqali serverda [deploy/deploy.sh](deploy/deploy.sh) ishga tushadi (`git merge --ff-only`, `composer install --no-dev`, `migrate --force`, `optimize`). PR'larda faqat testlar.
+
+- Server: HestiaCP `ruslan.firstcoders.uz`, foydalanuvchi `beeeexpress`, papka `~/web/delivery.firstcoder.uz/public_html` (nginx `laravel` shabloni, PHP 8.4), baza `beeeexpress_delivery`.
+- Secret'lar: `DEPLOY_SSH_KEY`, `DEPLOY_KNOWN_HOSTS`. Serverdagi bu kalit `authorized_keys` da `command=` bilan cheklangan — faqat `deploy.sh` ni bajaradi.
+- `.env` va `storage/` serverda turadi, repoga kirmaydi. Serverda tracked faylni qo'lda o'zgartirsangiz deploy to'xtaydi (jimgina yo'qolmasligi uchun).
+- Qo'lda qayta deploy: GitHub → Actions → Delivery → Run workflow.
