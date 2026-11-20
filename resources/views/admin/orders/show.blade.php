@@ -117,7 +117,7 @@
                             <span class="item-index">{{ $loop->iteration }}</span>
                             <div class="item-body">
                                 <div class="item-name">{{ $item->name }}</div>
-                                <div class="item-meta">{{ $item->quantityLabel() }}@if($item->note) · {{ $item->note }}@endif</div>
+                                <div class="item-meta">{{ $item->quantityLabel() }}@if($item->shop_name) · <i class="ti ti-building-store"></i> {{ $item->shop_name }}@endif @if($item->note) · {{ $item->note }}@endif</div>
                                 @if($item->courier_note)<div class="item-meta"><i class="ti ti-message-circle"></i> Kuryer: {{ $item->courier_note }}</div>@endif
                             </div>
                             <div class="item-side">

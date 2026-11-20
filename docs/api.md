@@ -9,7 +9,7 @@ Postman: [postman/](postman/) papkasi (6-bo'lim).
 | Baza URL | `https://<server>/api/v1` (lokal: `http://127.0.0.1:8000/api/v1`) |
 | Format | JSON, UTF-8. Har so'rovda `Accept: application/json` |
 | Avtorizatsiya | `Authorization: Bearer <token>` (Laravel Sanctum, muddatsiz — chiqishgacha) |
-| Vaqt | ISO 8601, `+05:00` (Toshkent) |
+| Vaqt | ISO 8601, `+05:00` (O'zbekiston vaqti) |
 | Pul | Butun son, so'm (`15000` = 15 000 so'm) |
 | Telefon | Javobda doim `+998XXXXXXXXX`; so'rovda istalgan ko'rinishda (`90 123 45 67` ham bo'ladi) |
 | Til | Barcha `message` va `label` o'zbekcha — foydalanuvchiga to'g'ridan-to'g'ri ko'rsatish mumkin |
@@ -75,7 +75,8 @@ OTP yuborish — raqamga 3/daqiqa (va 60 soniyada bir marta), IP ga 10/daqiqa. L
 | Splash | `GET /meta` (+ token bo'lsa `GET /me`) |
 | Telefon kiritish | `POST /auth/otp/send` |
 | Kod kiritish | `POST /auth/otp/verify` → `is_new` bo'lsa ism ekrani → `PATCH /me` |
-| Ro'yxat tuzish | — (lokal; birliklar `meta.units`, chegarasi `meta.max_items_per_order`) |
+| Katalog (do'konlar, mahsulotlar) | `GET /client/shops`, `GET /client/products?shop_id=&q=`, `GET /client/products/{id}` |
+| Ro'yxat tuzish | — (lokal savat: katalogdan tanlangan + erkin matn; birliklar `meta.units`, chegarasi `meta.max_items_per_order`) |
 | Manzil tanlash | `GET /client/addresses`, `POST /client/addresses` |
 | Tasdiqlash | `POST /client/orders` (yetkazish narxi `meta.delivery_fee` dan ko'rsatiladi) |
 | Buyurtmalarim | `GET /client/orders?scope=active` / `?scope=history` |
@@ -124,20 +125,36 @@ POST /auth/otp/verify
 ### 2.4. Manzillar
 ```http
 POST /client/addresses
-{ "title": "Uy", "address": "Chilonzor 9-kvartal, 12-uy", "entrance": "2", "floor": "4", "apartment": "38",
-  "landmark": "Maktab ro'parasi", "lat": 41.2856, "lng": 69.2034 }
+{ "title": "Uy", "address": "Navoiy ko'chasi, 12-uy", "entrance": "2", "floor": "4", "apartment": "38",
+  "landmark": "Maktab ro'parasi", "lat": 41.0012, "lng": 71.6698 }
 → 201 { "data": { "id": 1, "title": "Uy", "address": "...", ... } }
 ```
 `PUT /client/addresses/{id}` — to'liq almashtirish (`address` majburiy). `DELETE` — eski buyurtmalarga ta'sir qilmaydi.
 `lat`/`lng` ikkalasi birga yoki ikkalasi ham yo'q.
 
-### 2.5. Buyurtma berish
+### 2.5. Katalog — do'konlar va mahsulotlar
+Moderator admin panelda do'kon va mahsulotlarni yuritadi. Mijozga **faqat faol do'konlar va ularning faol mahsulotlari** keladi; nofaolini so'rasangiz — `404`.
+```http
+GET /client/shops?q=chorsu&limit=20
+→ 200 { "data": [ { "id": 1, "name": "Chorsu bozori", "description": null, "address": "Navoiy ko'chasi, 3-qator",
+                    "phone": "+998692001122", "lat": 40.9995, "lng": 71.6712, "image_url": "https://.../logo.webp", "products_count": 12 } ],
+        "links": {...}, "meta": {...} }
+
+GET /client/products?shop_id=1&q=kart
+→ 200 { "data": [ { "id": 5, "shop_id": 1, "name": "Kartoshka", "description": null, "unit": {"value":"kg","label":"kg"},
+                    "price": 8000, "image_url": null, "shop": { "id": 1, "name": "Chorsu bozori", "address": "..." } } ], ... }
+```
+- `price` — **taxminiy** narx, 1 birlik uchun, `null` bo'lishi mumkin. "≈ 8 000 so'm/kg" deb ko'rsating; haqiqiy narxni kuryer xariddan keyin kiritadi va jami summaga faqat o'sha kiradi.
+- `image_url` `null` bo'lsa — ikon ko'rsating.
+- Katalog ixtiyoriy: mijoz ro'yxatga katalogda yo'q narsani erkin matn bilan ham yozadi.
+
+### 2.6. Buyurtma berish
 ```http
 POST /client/orders
 Idempotency-Key: 3f0b8d2e-6a51-4c0e-9d7a-1f2b3c4d5e6f
 {
-  "address": "Yunusobod 4-kvartal, 15-uy", "floor": "4", "apartment": "38", "landmark": "Makro yonida",
-  "lat": 41.364, "lng": 69.287,
+  "address": "Uychi ko'chasi, 15-uy", "floor": "4", "apartment": "38", "landmark": "Chorsu bozori yonida",
+  "lat": 41.005, "lng": 71.66,
   "items": [
     { "name": "Kartoshka", "quantity": 3, "unit": "kg" },
     { "name": "Non", "quantity": 4, "unit": "pcs", "note": "issiq bo'lsin" }
@@ -148,14 +165,21 @@ Idempotency-Key: 3f0b8d2e-6a51-4c0e-9d7a-1f2b3c4d5e6f
 ```
 Saqlangan manzil bilan: `{ "address_id": 1, "items": [...] }` (boshqa manzil maydonlari kerak emas).
 
+Katalogdan tanlangan mahsulot: `{ "product_id": 5, "quantity": 3 }` — `name` va `unit` mahsulotdan olinadi (berilsa — berilgani). Erkin matn bilan aralashtirish mumkin:
+```json
+"items": [ { "product_id": 5, "quantity": 3, "note": "yirik bo'lsin" }, { "name": "Non", "quantity": 4, "unit": "pcs" } ]
+```
+Mahsulot shu orada nofaol bo'lib qolsa — `422`, `errors["items.0.product_id"] = ["Bu mahsulot hozir mavjud emas."]`: savatdan olib tashlashni taklif qiling.
+Javobdagi mahsulot qatorida `product_id` va `shop_name` (buyurtma paytidagi do'kon nomi nusxasi) keladi; erkin matnda ikkalasi `null`.
+
 ```json
 // 201
 {
   "data": {
     "id": 7, "number": "D000007",
     "status": { "value": "pending", "label": "Yangi" },
-    "address": { "address": "Yunusobod 4-kvartal, 15-uy", "entrance": null, "floor": "4", "apartment": "38",
-                 "landmark": "Makro yonida", "lat": 41.364, "lng": 69.287 },
+    "address": { "address": "Uychi ko'chasi, 15-uy", "entrance": null, "floor": "4", "apartment": "38",
+                 "landmark": "Chorsu bozori yonida", "lat": 41.005, "lng": 71.66 },
     "contact": { "name": "Malika Yusupova", "phone": "+998935550001" },
     "note": "Domofon ishlamaydi",
     "items": [
@@ -177,8 +201,10 @@ Saqlangan manzil bilan: `{ "address_id": 1, "items": [...] }` (boshqa manzil may
 - **Narx yubormang** — server e'tiborsiz qoldiradi. Yangi buyurtmada `items_total = 0`: mahsulot narxlarini kuryer xariddan keyin kiritadi. Tasdiqlash ekranida "Mahsulot narxi xariddan keyin ma'lum bo'ladi" deb yozing.
 - **`Idempotency-Key`:** "Buyurtma berish" bosilganda bitta UUID yarating va javob kelguncha qayta urinishlarda **o'shani** yuboring. Server bir kalit uchun bitta buyurtma yaratadi (qayta so'rovga `200` va o'sha buyurtma).
 - `contact_name`/`contact_phone` — boshqa odam qabul qilsa; bo'lmasa profildan olinadi.
+- **Xizmat faqat Namangan shahrida.** Xaritani Namangan markaziga (`40.9983, 71.6726`) ochib qo'ying. Hududdan tashqari manzilni server hozircha rad etmaydi — moderator bekor qiladi.
+- **Mijoz eshikda bo'lishi va naqd to'lashi shart** (hozircha yagona usul `cash`). Tasdiqlash ekranida yozing: "Kuryerni eshikda kutib oling, to'lov naqd".
 
-### 2.6. Buyurtma holatlari — mijozga nima ko'rsatish
+### 2.7. Buyurtma holatlari — mijozga nima ko'rsatish
 
 | `status.value` | Ekranda | Tugmalar |
 |---|---|---|
@@ -194,7 +220,7 @@ Saqlangan manzil bilan: `{ "address_id": 1, "items": [...] }` (boshqa manzil may
 - `courier` maydoni faqat kuryer biriktirilganda keladi.
 - Ro'yxatda `items` o'rniga `items_count` keladi; tafsilotda `items` va `history`.
 
-### 2.7. Bekor qilish
+### 2.8. Bekor qilish
 ```http
 POST /client/orders/7/cancel
 { "reason": "Rejalar o'zgardi" }        // ixtiyoriy
@@ -237,7 +263,7 @@ POST /auth/courier/login
 ### 3.3. Holat va joylashuv
 ```http
 PATCH /courier/online      { "is_online": true }
-POST  /courier/location    { "lat": 41.3111, "lng": 69.2797 }
+POST  /courier/location    { "lat": 40.9983, "lng": 71.6726 }
 ```
 Onlayn kuryerlar moderatorga birinchi ko'rinadi, masofa joylashuvdan hisoblanadi (keyingi bosqichda avtomatik taqsimlash ham shunga tayanadi).
 
@@ -262,6 +288,7 @@ PATCH /courier/orders/9/items/29
 { "status": "unavailable", "courier_note": "Do'konda tugagan" }
 ```
 - `price` — shu **qator uchun to'langan jami** summa (3 kg uchun, 1 kg emas).
+- `shop_name` bo'lsa — mijoz mahsulotni shu do'kondan tanlagan; ro'yxatda ko'rsating.
 - Xato kiritilsa — qayta yuborib tuzatish mumkin (bozorlik tugaguncha).
 - Joriy jami summani ko'rsatish uchun: `sum(items[status=purchased].price)` yoki `GET` qilib `amounts` dan oling.
 
@@ -338,5 +365,6 @@ Import → environment tanlang → `1. Avtorizatsiya` ni ishga tushiring: `clien
 | Versiya | Sana | O'zgarish |
 |---|---|---|
 | 1.0.0 | 2026-11-20 | Birinchi versiya: mijoz va kuryer API, bildirishnomalar, qurilma tokenlari |
+| 1.1.0 | 2026-11-20 | Katalog: `GET /client/shops`, `/client/shops/{id}`, `/client/products`, `/client/products/{id}`. Buyurtmada `items.*.product_id` (ixtiyoriy); mahsulot qatoriga `product_id`, `shop_name` qo'shildi. Buzilmaydigan o'zgarish |
 
 Kontrakt buzadigan o'zgarish bo'lsa `/api/v2` ochiladi; v1 ga faqat yangi ixtiyoriy maydonlar qo'shiladi — ilova noma'lum maydonlarni e'tiborsiz qoldirsin.

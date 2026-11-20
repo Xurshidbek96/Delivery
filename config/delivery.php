@@ -40,6 +40,9 @@ return [
 
     'receipts_disk' => 'public',
 
+    // Do'kon logotiplari va mahsulot rasmlari
+    'catalog_disk' => 'public',
+
     // Swagger UI: /docs/api va /docs/openapi.yaml. Mobil jamoa ishlayotgan paytda yoqilgan bo'lsin;
     // ommaviy ishga tushirilganda o'chirish mumkin.
     'api_docs' => [

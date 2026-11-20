@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\V1\Auth\CourierAuthController;
 use App\Http\Controllers\Api\V1\Auth\OtpController;
 use App\Http\Controllers\Api\V1\Auth\SessionController;
 use App\Http\Controllers\Api\V1\Client\AddressController;
+use App\Http\Controllers\Api\V1\Client\CatalogController;
 use App\Http\Controllers\Api\V1\Client\OrderController as ClientOrderController;
 use App\Http\Controllers\Api\V1\Courier\OrderController as CourierOrderController;
 use App\Http\Controllers\Api\V1\Courier\ProfileController as CourierProfileController;
@@ -47,6 +48,12 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
             Route::post('addresses', [AddressController::class, 'store'])->name('addresses.store');
             Route::put('addresses/{address}', [AddressController::class, 'update'])->whereNumber('address')->name('addresses.update');
             Route::delete('addresses/{address}', [AddressController::class, 'destroy'])->whereNumber('address')->name('addresses.destroy');
+
+            // Katalog (faqat faol do'kon va mahsulotlar)
+            Route::get('shops', [CatalogController::class, 'shops'])->name('shops.index');
+            Route::get('shops/{shop}', [CatalogController::class, 'shop'])->whereNumber('shop')->name('shops.show');
+            Route::get('products', [CatalogController::class, 'products'])->name('products.index');
+            Route::get('products/{product}', [CatalogController::class, 'product'])->whereNumber('product')->name('products.show');
 
             Route::get('orders', [ClientOrderController::class, 'index'])->name('orders.index');
             Route::post('orders', [ClientOrderController::class, 'store'])->name('orders.store');

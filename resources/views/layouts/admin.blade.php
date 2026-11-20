@@ -22,6 +22,16 @@
             </a>
         </nav>
 
+        <div class="menu-label">Katalog</div>
+        <nav class="menu" aria-label="Katalog">
+            <a href="{{ route('admin.shops.index') }}" @class(['active' => request()->routeIs('admin.shops.*')])>
+                <i class="ti ti-building-store"></i><span>Do'konlar</span>
+            </a>
+            <a href="{{ route('admin.products.index') }}" @class(['active' => request()->routeIs('admin.products.*')])>
+                <i class="ti ti-package"></i><span>Mahsulotlar</span>
+            </a>
+        </nav>
+
         <div class="menu-label">Foydalanuvchilar</div>
         <nav class="menu" aria-label="Foydalanuvchilar">
             <a href="{{ route('admin.couriers.index') }}" @class(['active' => request()->routeIs('admin.couriers.*')])>

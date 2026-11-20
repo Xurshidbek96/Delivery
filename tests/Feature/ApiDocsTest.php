@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Product;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Routing\Route;
@@ -99,6 +100,19 @@ class ApiDocsTest extends TestCase
         $this->assertSame([], array_diff($orderKeys, array_keys($schemas['Order']['properties'])), 'Order sxemasida yo\'q maydonlar');
         $this->assertSame([], array_diff($itemKeys, array_keys($schemas['OrderItem']['properties'])), 'OrderItem sxemasida yo\'q maydonlar');
         $this->assertSame([], array_diff([...$userKeys, ...$courierKeys], array_keys($schemas['User']['properties'])), 'User sxemasida yo\'q maydonlar');
+    }
+
+    public function test_catalog_responses_match_schema(): void
+    {
+        $schemas = $this->spec()['components']['schemas'];
+        Product::factory()->create();
+        $this->actingAsApi(User::factory()->client()->create());
+
+        $shopKeys = array_keys($this->getJson('/api/v1/client/shops')->json('data.0'));
+        $productKeys = array_keys($this->getJson('/api/v1/client/products')->json('data.0'));
+
+        $this->assertSame([], array_diff($shopKeys, array_keys($schemas['Shop']['properties'])), 'Shop sxemasida yo\'q maydonlar');
+        $this->assertSame([], array_diff($productKeys, array_keys($schemas['Product']['properties'])), 'Product sxemasida yo\'q maydonlar');
     }
 
     public function test_swagger_ui_and_spec_are_served(): void

@@ -21,6 +21,7 @@ Laravel 12 monolit: mobil ilovalar uchun REST API (`/api/v1`, Sanctum token) va 
 | Kontraktlar | `app/Contracts` | Almashtiriladigan drayverlar (pastga qarang) |
 | HTTP | `app/Http` | Yupqa controllerlar, FormRequest (validatsiya + DTO), API Resource |
 | Ko'rinish | `resources/views/admin`, `public/css/admin.css`, `public/js/admin.js` | Build qadamisiz admin panel |
+| Katalog | `Models\Shop`, `Models\Product` (`scopeVisible`), `Models\Concerns\HasImage` | Do'kon → mahsulotlar. Mijozga ko'rinish qoidasi faqat `Product::visible()` / `Shop::active()` da. Rasmlar `delivery.catalog_disk` |
 
 ## Kengaytirish nuqtalari
 

@@ -36,6 +36,8 @@ tags:
   - name: Bildirishnomalar
     description: Mijoz va kuryer uchun umumiy
   - name: Mijoz — manzillar
+  - name: Mijoz — katalog
+    description: Admin paneldagi faol do'konlar va ularning faol mahsulotlari
   - name: Mijoz — buyurtmalar
   - name: Kuryer — holat
   - name: Kuryer — buyurtmalar
@@ -364,6 +366,117 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
 
+  /client/shops:
+    get:
+      tags: [Mijoz — katalog]
+      summary: Do'konlar
+      description: Faqat faol do'konlar, `sort_order` va nom bo'yicha. `products_count` — faol mahsulotlar soni.
+      operationId: listShops
+      parameters:
+        - name: q
+          in: query
+          description: Nom bo'yicha qidiruv
+          schema: { type: string, maxLength: 100 }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/Shop' }
+                  links: { $ref: '#/components/schemas/PaginationLinks' }
+                  meta: { $ref: '#/components/schemas/PaginationMeta' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /client/shops/{shop}:
+    get:
+      tags: [Mijoz — katalog]
+      summary: Do'kon
+      description: Nofaol do'kon — 404.
+      operationId: getShop
+      parameters:
+        - name: shop
+          in: path
+          required: true
+          schema: { type: integer, example: 1 }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Shop' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /client/products:
+    get:
+      tags: [Mijoz — katalog]
+      summary: Mahsulotlar
+      description: |
+        Faqat mijozga ko'rinadigan mahsulotlar: mahsulot **va** uning do'koni faol.
+        `price` — taxminiy narx (1 birlik uchun, bo'lmasligi mumkin). Haqiqiy narxni kuryer xariddan keyin kiritadi.
+      operationId: listProducts
+      parameters:
+        - name: shop_id
+          in: query
+          description: Bitta do'kon mahsulotlari
+          schema: { type: integer }
+        - name: q
+          in: query
+          description: Nom bo'yicha qidiruv
+          schema: { type: string, maxLength: 100 }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/Product' }
+                  links: { $ref: '#/components/schemas/PaginationLinks' }
+                  meta: { $ref: '#/components/schemas/PaginationMeta' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/UnprocessableEntity' }
+
+  /client/products/{product}:
+    get:
+      tags: [Mijoz — katalog]
+      summary: Mahsulot
+      description: Mahsulot yoki do'koni nofaol — 404.
+      operationId: getProduct
+      parameters:
+        - name: product
+          in: path
+          required: true
+          schema: { type: integer, example: 5 }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Product' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
   /client/orders:
     get:
       tags: [Mijoz — buyurtmalar]
@@ -385,6 +498,9 @@ paths:
       summary: Buyurtma berish
       description: |
         Manzil: `address_id` (o'z saqlangan manzili) **yoki** `address` + ixtiyoriy maydonlar.
+
+        Mahsulot: erkin matn (`name` + `unit`) **yoki** katalogdan (`product_id` + `quantity`; `name`/`unit` berilmasa mahsulotnikidan olinadi).
+        Mahsulot nofaol yoki topilmasa — 422, `errors["items.N.product_id"]`.
 
         **Narx yuborilmaydi.** `price`, `total`, `delivery_fee` kabi maydonlar e'tiborsiz qoldiriladi:
         yetkazish narxi sozlamadan olinadi, mahsulot narxini kuryer xariddan keyin kiritadi.
@@ -490,8 +606,8 @@ paths:
               type: object
               required: [lat, lng]
               properties:
-                lat: { type: number, format: double, minimum: -90, maximum: 90, example: 41.3111 }
-                lng: { type: number, format: double, minimum: -180, maximum: 180, example: 69.2797 }
+                lat: { type: number, format: double, minimum: -90, maximum: 90, example: 40.9983 }
+                lng: { type: number, format: double, minimum: -180, maximum: 180, example: 71.6726 }
       responses:
         '200': { $ref: '#/components/responses/Message' }
         '401': { $ref: '#/components/responses/Unauthorized' }
@@ -808,13 +924,13 @@ components:
       required: [address]
       properties:
         title: { type: string, maxLength: 60, nullable: true, example: Uy }
-        address: { type: string, maxLength: 255, example: 'Chilonzor 9-kvartal, 12-uy' }
+        address: { type: string, maxLength: 255, example: 'Navoiy ko''chasi, 12-uy' }
         entrance: { type: string, maxLength: 20, nullable: true, example: '2' }
         floor: { type: string, maxLength: 20, nullable: true, example: '4' }
         apartment: { type: string, maxLength: 20, nullable: true, example: '38' }
         landmark: { type: string, maxLength: 255, nullable: true, example: Maktab ro'parasi }
-        lat: { type: number, format: double, nullable: true, description: '`lng` bilan birga', example: 41.2856 }
-        lng: { type: number, format: double, nullable: true, description: '`lat` bilan birga', example: 69.2034 }
+        lat: { type: number, format: double, nullable: true, description: '`lng` bilan birga', example: 41.0012 }
+        lng: { type: number, format: double, nullable: true, description: '`lat` bilan birga', example: 71.6698 }
 
     Address:
       allOf:
@@ -825,11 +941,13 @@ components:
 
     OrderItemInput:
       type: object
-      required: [name, quantity, unit]
+      required: [quantity]
+      description: '`product_id` bo''lmasa `name` va `unit` majburiy'
       properties:
-        name: { type: string, minLength: 2, maxLength: 150, example: Kartoshka }
+        product_id: { type: integer, nullable: true, description: 'Katalog mahsuloti (`GET /client/products`)', example: 5 }
+        name: { type: string, minLength: 2, maxLength: 150, description: '`product_id` bo''lsa ixtiyoriy', example: Kartoshka }
         quantity: { type: number, exclusiveMinimum: true, minimum: 0, maximum: 1000, example: 3 }
-        unit: { type: string, enum: [pcs, kg, g, l, pack, bunch], example: kg }
+        unit: { type: string, enum: [pcs, kg, g, l, pack, bunch], description: '`product_id` bo''lsa ixtiyoriy', example: kg }
         note: { type: string, maxLength: 255, nullable: true, example: Yirik bo'lsin }
 
     OrderInput:
@@ -837,13 +955,13 @@ components:
       required: [items]
       properties:
         address_id: { type: integer, description: 'O''z saqlangan manzili. Berilsa, quyidagi manzil maydonlari e''tiborsiz', example: 1 }
-        address: { type: string, maxLength: 255, description: '`address_id` bo''lmasa majburiy', example: 'Yunusobod 4-kvartal, 15-uy' }
+        address: { type: string, maxLength: 255, description: '`address_id` bo''lmasa majburiy', example: 'Uychi ko''chasi, 15-uy' }
         entrance: { type: string, maxLength: 20 }
         floor: { type: string, maxLength: 20, example: '4' }
         apartment: { type: string, maxLength: 20, example: '38' }
-        landmark: { type: string, maxLength: 255, example: Makro yonida }
-        lat: { type: number, format: double, example: 41.364 }
-        lng: { type: number, format: double, example: 69.287 }
+        landmark: { type: string, maxLength: 255, example: Chorsu bozori yonida }
+        lat: { type: number, format: double, example: 41.005 }
+        lng: { type: number, format: double, example: 71.66 }
         items:
           type: array
           minItems: 1
@@ -859,6 +977,8 @@ components:
       type: object
       properties:
         id: { type: integer, example: 23 }
+        product_id: { type: integer, nullable: true, description: Katalogdan tanlangan bo'lsa, example: 5 }
+        shop_name: { type: string, nullable: true, description: 'Do''kon nomi (buyurtma paytidagi nusxa)', example: Chorsu bozori }
         name: { type: string, example: Kartoshka }
         quantity: { type: number, example: 3 }
         unit:
@@ -871,6 +991,38 @@ components:
           example: { value: purchased, label: Olindi }
         price: { type: integer, nullable: true, description: Kuryer to'lagan qator summasi, example: 24000 }
         courier_note: { type: string, nullable: true }
+
+    Shop:
+      type: object
+      properties:
+        id: { type: integer, example: 1 }
+        name: { type: string, example: Chorsu bozori }
+        description: { type: string, nullable: true }
+        address: { type: string, nullable: true, example: 'Navoiy ko''chasi, 3-qator' }
+        phone: { type: string, nullable: true, example: '+998692001122' }
+        lat: { type: number, nullable: true, example: 40.9995 }
+        lng: { type: number, nullable: true, example: 71.6712 }
+        image_url: { type: string, format: uri, nullable: true }
+        products_count: { type: integer, description: Faol mahsulotlar soni, example: 12 }
+
+    Product:
+      type: object
+      properties:
+        id: { type: integer, example: 5 }
+        shop_id: { type: integer, example: 1 }
+        name: { type: string, example: Kartoshka }
+        description: { type: string, nullable: true }
+        unit:
+          allOf: [{ $ref: '#/components/schemas/Option' }]
+          example: { value: kg, label: kg }
+        price: { type: integer, nullable: true, description: 'Taxminiy narx, 1 birlik uchun (so''m). Haqiqiysini kuryer kiritadi', example: 8000 }
+        image_url: { type: string, format: uri, nullable: true }
+        shop:
+          type: object
+          properties:
+            id: { type: integer, example: 1 }
+            name: { type: string, example: Chorsu bozori }
+            address: { type: string, nullable: true }
 
     OrderHistory:
       type: object
@@ -893,13 +1045,13 @@ components:
         address:
           type: object
           properties:
-            address: { type: string, example: 'Yunusobod 4-kvartal, 15-uy' }
+            address: { type: string, example: 'Uychi ko''chasi, 15-uy' }
             entrance: { type: string, nullable: true }
             floor: { type: string, nullable: true, example: '4' }
             apartment: { type: string, nullable: true, example: '38' }
-            landmark: { type: string, nullable: true, example: Makro yonida }
-            lat: { type: number, nullable: true, example: 41.364 }
-            lng: { type: number, nullable: true, example: 69.287 }
+            landmark: { type: string, nullable: true, example: Chorsu bozori yonida }
+            lat: { type: number, nullable: true, example: 41.005 }
+            lng: { type: number, nullable: true, example: 71.66 }
         contact:
           type: object
           properties:

@@ -5,8 +5,10 @@ use App\Http\Controllers\Admin\ClientController;
 use App\Http\Controllers\Admin\CourierController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\OrderController;
+use App\Http\Controllers\Admin\ProductController;
 use App\Http\Controllers\Admin\ProfileController;
 use App\Http\Controllers\Admin\SettingController;
+use App\Http\Controllers\Admin\ShopController;
 use App\Http\Controllers\Admin\StaffController;
 use App\Http\Controllers\ApiDocsController;
 use Illuminate\Support\Facades\Route;
@@ -43,6 +45,12 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::get('clients', [ClientController::class, 'index'])->name('clients.index');
         Route::get('clients/{client}', [ClientController::class, 'show'])->name('clients.show');
         Route::post('clients/{client}/toggle', [ClientController::class, 'toggle'])->name('clients.toggle');
+
+        // Katalog: do'konlar va mahsulotlar (faollari mijoz ilovasida ko'rinadi)
+        Route::resource('shops', ShopController::class);
+        Route::post('shops/{shop}/toggle', [ShopController::class, 'toggle'])->name('shops.toggle');
+        Route::resource('products', ProductController::class)->except('show');
+        Route::post('products/{product}/toggle', [ProductController::class, 'toggle'])->name('products.toggle');
 
         Route::get('profile', [ProfileController::class, 'edit'])->name('profile.edit');
         Route::put('profile/password', [ProfileController::class, 'password'])->name('profile.password');

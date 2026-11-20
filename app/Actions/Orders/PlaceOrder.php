@@ -62,6 +62,8 @@ class PlaceOrder
 
             foreach (array_values($data->items) as $position => $item) {
                 $order->items()->create([
+                    'product_id' => $item['product_id'] ?? null,
+                    'shop_name' => $item['shop_name'] ?? null,
                     'name' => $item['name'],
                     'quantity' => $item['quantity'],
                     'unit' => $item['unit'],

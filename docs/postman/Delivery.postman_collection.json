@@ -42,6 +42,14 @@
       "value": ""
     },
     {
+      "key": "shop_id",
+      "value": ""
+    },
+    {
+      "key": "product_id",
+      "value": ""
+    },
+    {
       "key": "notification_id",
       "value": ""
     },
@@ -654,7 +662,7 @@
                 "description": "",
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"title\": \"Uy\",\n  \"address\": \"Chilonzor 9-kvartal, 12-uy\",\n  \"entrance\": \"2\",\n  \"floor\": \"4\",\n  \"apartment\": \"38\",\n  \"landmark\": \"Maktab ro'parasi\",\n  \"lat\": 41.2856,\n  \"lng\": 69.2034\n}",
+                  "raw": "{\n  \"title\": \"Uy\",\n  \"address\": \"Navoiy ko'chasi, 12-uy\",\n  \"entrance\": \"2\",\n  \"floor\": \"4\",\n  \"apartment\": \"38\",\n  \"landmark\": \"Maktab ro'parasi\",\n  \"lat\": 41.0012,\n  \"lng\": 71.6698\n}",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -703,7 +711,7 @@
                 "description": "",
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"title\": \"Uy\",\n  \"address\": \"Chilonzor 9-kvartal, 14-uy\",\n  \"floor\": \"5\",\n  \"lat\": 41.2856,\n  \"lng\": 69.2034\n}",
+                  "raw": "{\n  \"title\": \"Uy\",\n  \"address\": \"Navoiy ko'chasi, 14-uy\",\n  \"floor\": \"5\",\n  \"lat\": 41.0012,\n  \"lng\": 71.6698\n}",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -746,6 +754,188 @@
                   ]
                 },
                 "description": ""
+              }
+            }
+          ]
+        },
+        {
+          "id": "a4c39651-d6e3-57bf-8b5a-b9447648dc65",
+          "name": "Katalog",
+          "description": "",
+          "item": [
+            {
+              "id": "b772487a-6417-5766-b3aa-16628e3bdc9a",
+              "name": "Do'konlar",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                      "const s = pm.response.json().data[0]; if (s) pm.collectionVariables.set('shop_id', s.id);"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/client/shops?q=&limit=20",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "client",
+                    "shops"
+                  ],
+                  "query": [
+                    {
+                      "key": "q",
+                      "value": "",
+                      "description": "Nom bo'yicha qidiruv",
+                      "disabled": true
+                    },
+                    {
+                      "key": "limit",
+                      "value": "20",
+                      "description": "1..100"
+                    }
+                  ]
+                },
+                "description": "Faqat faol do'konlar. Birinchisi `shop_id` ga saqlanadi."
+              }
+            },
+            {
+              "id": "9548f655-b611-55b0-9f48-694ca01fa5ee",
+              "name": "Do'kon",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 200', () => pm.response.to.have.status(200));"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/client/shops/{{shop_id}}",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "client",
+                    "shops",
+                    "{{shop_id}}"
+                  ]
+                },
+                "description": "Nofaol do'kon — 404."
+              }
+            },
+            {
+              "id": "cc6b6383-2bd9-5500-835d-1358b7b60fd5",
+              "name": "Mahsulotlar",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                      "const p = pm.response.json().data[0]; if (p) pm.collectionVariables.set('product_id', p.id);"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/client/products?shop_id={{shop_id}}&q=&limit=20",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "client",
+                    "products"
+                  ],
+                  "query": [
+                    {
+                      "key": "shop_id",
+                      "value": "{{shop_id}}",
+                      "description": "Bitta do'kon mahsulotlari"
+                    },
+                    {
+                      "key": "q",
+                      "value": "",
+                      "description": "Nom bo'yicha qidiruv",
+                      "disabled": true
+                    },
+                    {
+                      "key": "limit",
+                      "value": "20",
+                      "description": "1..100"
+                    }
+                  ]
+                },
+                "description": "Faqat faol mahsulotlar (do'koni ham faol). `price` — taxminiy, 1 birlik uchun. Birinchisi `product_id` ga saqlanadi."
+              }
+            },
+            {
+              "id": "12065b1c-1715-555d-a120-ef0a97ca9458",
+              "name": "Mahsulot",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 200', () => pm.response.to.have.status(200));"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/client/products/{{product_id}}",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "client",
+                    "products",
+                    "{{product_id}}"
+                  ]
+                },
+                "description": "Mahsulot yoki do'koni nofaol — 404."
               }
             }
           ]
@@ -811,7 +1001,57 @@
                 "description": "Narx yuborilmaydi — `delivery_fee` serverda, mahsulot narxlarini kuryer kiritadi. Javobdagi `id` → `order_id`.\n\nKeyingi qadam: admin panelda (moderator) buyurtmani **tasdiqlang** va kuryerni (`+998901110001`) **tanlang**, so'ng 4-papkaga o'ting.",
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"address\": \"Yunusobod 4-kvartal, 15-uy\",\n  \"floor\": \"4\",\n  \"apartment\": \"38\",\n  \"landmark\": \"Makro yonida\",\n  \"lat\": 41.364,\n  \"lng\": 69.287,\n  \"items\": [\n    {\n      \"name\": \"Kartoshka\",\n      \"quantity\": 3,\n      \"unit\": \"kg\"\n    },\n    {\n      \"name\": \"Non\",\n      \"quantity\": 4,\n      \"unit\": \"pcs\",\n      \"note\": \"issiq bo'lsin\"\n    },\n    {\n      \"name\": \"Sut 3.2%\",\n      \"quantity\": 2,\n      \"unit\": \"l\"\n    }\n  ],\n  \"payment_method\": \"cash\",\n  \"note\": \"Domofon ishlamaydi\"\n}",
+                  "raw": "{\n  \"address\": \"Uychi ko'chasi, 15-uy\",\n  \"floor\": \"4\",\n  \"apartment\": \"38\",\n  \"landmark\": \"Chorsu bozori yonida\",\n  \"lat\": 41.005,\n  \"lng\": 71.66,\n  \"items\": [\n    {\n      \"name\": \"Kartoshka\",\n      \"quantity\": 3,\n      \"unit\": \"kg\"\n    },\n    {\n      \"name\": \"Non\",\n      \"quantity\": 4,\n      \"unit\": \"pcs\",\n      \"note\": \"issiq bo'lsin\"\n    },\n    {\n      \"name\": \"Sut 3.2%\",\n      \"quantity\": 2,\n      \"unit\": \"l\"\n    }\n  ],\n  \"payment_method\": \"cash\",\n  \"note\": \"Domofon ishlamaydi\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "id": "d4f40c4b-a6ef-5e83-a872-a5dbe235c13f",
+              "name": "Buyurtma berish (katalogdan)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 201', () => pm.response.to.have.status(201));",
+                      "if (pm.response.code < 300) { pm.collectionVariables.set('order_id', pm.response.json().data.id); }",
+                      "pm.test('do'kon nomi nusxalandi', () => pm.expect(pm.response.json().data.items[0].shop_name).to.be.a('string'));"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/client/orders",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "client",
+                    "orders"
+                  ]
+                },
+                "description": "Katalog mahsuloti: `product_id` + `quantity` (nom va birlik mahsulotdan olinadi). Erkin matn bilan aralashtirish mumkin. Avval \"Mahsulotlar\" va \"Manzil qo'shish\" ni bajaring.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"address_id\": \"{{address_id}}\",\n  \"items\": [\n    {\n      \"product_id\": \"{{product_id}}\",\n      \"quantity\": 2\n    },\n    {\n      \"name\": \"Non\",\n      \"quantity\": 4,\n      \"unit\": \"pcs\"\n    }\n  ]\n}",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -1109,7 +1349,7 @@
             "description": "",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"lat\": 41.3111,\n  \"lng\": 69.2797\n}",
+              "raw": "{\n  \"lat\": 40.9983,\n  \"lng\": 71.6726\n}",
               "options": {
                 "raw": {
                   "language": "json"

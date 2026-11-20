@@ -79,16 +79,28 @@ client = folder("3. Mijoz ilovasi", [
     folder("Manzillar", [
         req("Manzillar ro'yxati", "GET", "/client/addresses"),
         req("Manzil qo'shish", "POST", "/client/addresses",
-            {"title": "Uy", "address": "Chilonzor 9-kvartal, 12-uy", "entrance": "2", "floor": "4", "apartment": "38", "landmark": "Maktab ro'parasi", "lat": 41.2856, "lng": 69.2034},
+            {"title": "Uy", "address": "Navoiy ko'chasi, 12-uy", "entrance": "2", "floor": "4", "apartment": "38", "landmark": "Maktab ro'parasi", "lat": 41.0012, "lng": 71.6698},
             code=201, tests=[save('address_id', 'pm.response.json().data.id')]),
         req("Manzilni yangilash", "PUT", "/client/addresses/{{address_id}}",
-            {"title": "Uy", "address": "Chilonzor 9-kvartal, 14-uy", "floor": "5", "lat": 41.2856, "lng": 69.2034}),
+            {"title": "Uy", "address": "Navoiy ko'chasi, 14-uy", "floor": "5", "lat": 41.0012, "lng": 71.6698}),
         req("Manzilni o'chirish", "DELETE", "/client/addresses/{{address_id}}"),
+    ]),
+    folder("Katalog", [
+        req("Do'konlar", "GET", "/client/shops",
+            query=[("q", "", "Nom bo'yicha qidiruv", True), ("limit", "20", "1..100")],
+            desc="Faqat faol do'konlar. Birinchisi `shop_id` ga saqlanadi.",
+            tests=["const s = pm.response.json().data[0]; if (s) pm.collectionVariables.set('shop_id', s.id);"]),
+        req("Do'kon", "GET", "/client/shops/{{shop_id}}", desc="Nofaol do'kon — 404."),
+        req("Mahsulotlar", "GET", "/client/products",
+            query=[("shop_id", "{{shop_id}}", "Bitta do'kon mahsulotlari"), ("q", "", "Nom bo'yicha qidiruv", True), ("limit", "20", "1..100")],
+            desc="Faqat faol mahsulotlar (do'koni ham faol). `price` — taxminiy, 1 birlik uchun. Birinchisi `product_id` ga saqlanadi.",
+            tests=["const p = pm.response.json().data[0]; if (p) pm.collectionVariables.set('product_id', p.id);"]),
+        req("Mahsulot", "GET", "/client/products/{{product_id}}", desc="Mahsulot yoki do'koni nofaol — 404."),
     ]),
     folder("Buyurtmalar", [
         req("Buyurtma berish (manzil bilan)", "POST", "/client/orders", {
-            "address": "Yunusobod 4-kvartal, 15-uy", "floor": "4", "apartment": "38", "landmark": "Makro yonida",
-            "lat": 41.364, "lng": 69.287,
+            "address": "Uychi ko'chasi, 15-uy", "floor": "4", "apartment": "38", "landmark": "Chorsu bozori yonida",
+            "lat": 41.005, "lng": 71.66,
             "items": [{"name": "Kartoshka", "quantity": 3, "unit": "kg"},
                       {"name": "Non", "quantity": 4, "unit": "pcs", "note": "issiq bo'lsin"},
                       {"name": "Sut 3.2%", "quantity": 2, "unit": "l"}],
@@ -101,6 +113,11 @@ client = folder("3. Mijoz ilovasi", [
             tests=[save('order_id', 'pm.response.json().data.id'),
                    "pm.test('holat: pending', () => pm.expect(pm.response.json().data.status.value).to.eql('pending'));",
                    "pm.test('xarid summasi hali 0', () => pm.expect(pm.response.json().data.amounts.items_total).to.eql(0));"]),
+        req("Buyurtma berish (katalogdan)", "POST", "/client/orders",
+            {"address_id": "{{address_id}}", "items": [{"product_id": "{{product_id}}", "quantity": 2}, {"name": "Non", "quantity": 4, "unit": "pcs"}]},
+            code=201, desc="Katalog mahsuloti: `product_id` + `quantity` (nom va birlik mahsulotdan olinadi). Erkin matn bilan aralashtirish mumkin. Avval \"Mahsulotlar\" va \"Manzil qo'shish\" ni bajaring.",
+            tests=[save('order_id', 'pm.response.json().data.id'),
+                   "pm.test('do\'kon nomi nusxalandi', () => pm.expect(pm.response.json().data.items[0].shop_name).to.be.a('string'));"]),
         req("Buyurtma berish (saqlangan manzil)", "POST", "/client/orders",
             {"address_id": "{{address_id}}", "items": [{"name": "Olma", "quantity": 2, "unit": "kg"}]},
             code=201, desc="Avval \"Manzil qo'shish\" ni bajaring.", tests=[save('order_id', 'pm.response.json().data.id')]),
@@ -115,7 +132,7 @@ client = folder("3. Mijoz ilovasi", [
 
 courier = folder("4. Kuryer ilovasi", [
     req("Ishga chiqdim (onlayn)", "PATCH", "/courier/online", {"is_online": True}),
-    req("Joylashuvni yuborish", "POST", "/courier/location", {"lat": 41.3111, "lng": 69.2797}),
+    req("Joylashuvni yuborish", "POST", "/courier/location", {"lat": 40.9983, "lng": 71.6726}),
     req("Faol buyurtmalarim", "GET", "/courier/orders", query=[("scope", "active", "active | history")],
         desc="Birinchi buyurtma `courier_order_id` ga saqlanadi.",
         tests=["const o = pm.response.json().data[0]; if (o) pm.collectionVariables.set('courier_order_id', o.id);"]),
@@ -161,7 +178,7 @@ collection = {
     "variable": [
         {"key": k, "value": v} for k, v in [
             ("client_token", ""), ("courier_token", ""), ("order_id", ""), ("courier_order_id", ""),
-            ("item_id", ""), ("address_id", ""), ("notification_id", ""), ("idempotency_key", ""),
+            ("item_id", ""), ("address_id", ""), ("shop_id", ""), ("product_id", ""), ("notification_id", ""), ("idempotency_key", ""),
         ]
     ],
     "item": [auth, common, client, courier, logout],

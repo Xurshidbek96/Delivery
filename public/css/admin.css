@@ -223,6 +223,22 @@ html.dark .menu .count { color: #1a1205; }
     font-weight: 700;
 }
 .avatar-lg { width: 56px; height: 56px; font-size: 1.25rem; }
+.thumb {
+    width: 44px;
+    height: 44px;
+    flex-shrink: 0;
+    display: inline-grid;
+    place-items: center;
+    overflow: hidden;
+    border-radius: 10px;
+    background: var(--soft);
+    color: var(--ink-3);
+    font-size: 20px;
+}
+.thumb img { width: 100%; height: 100%; object-fit: cover; }
+.thumb-lg { width: 96px; height: 96px; border-radius: 14px; font-size: 36px; }
+.check { display: inline-flex; align-items: center; gap: .45rem; color: var(--ink-2); font-size: .875rem; cursor: pointer; }
+.check input { width: 16px; height: 16px; accent-color: var(--brand); }
 
 /* ============ Tepa panel ============ */
 .topbar {

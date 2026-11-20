@@ -4,6 +4,7 @@ namespace Tests\Feature\Admin;
 
 use App\Actions\Orders\AssignCourier;
 use App\Actions\Orders\ConfirmOrder;
+use App\Models\Product;
 use App\Models\User;
 use App\Services\Settings\SettingsRepository;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -42,6 +43,7 @@ class AdminPanelTest extends TestCase
         $order = $this->placeOrder();
         app(ConfirmOrder::class)->handle($order, $admin);
         $this->placeOrder();
+        $product = Product::factory()->create();
 
         $this->actingAs($admin);
         foreach ([
@@ -49,6 +51,8 @@ class AdminPanelTest extends TestCase
             '/admin/couriers', '/admin/couriers/create', "/admin/couriers/{$courier->id}", "/admin/couriers/{$courier->id}/edit",
             '/admin/clients', "/admin/clients/{$order->client_id}", '/admin/staff', '/admin/staff/create',
             '/admin/settings', '/admin/profile',
+            '/admin/shops', '/admin/shops?state=active&q=a', '/admin/shops/create', "/admin/shops/{$product->shop_id}", "/admin/shops/{$product->shop_id}/edit",
+            '/admin/products', "/admin/products?shop_id={$product->shop_id}&state=visible", '/admin/products/create', "/admin/products/{$product->id}/edit",
         ] as $url) {
             $this->get($url)->assertOk();
         }
